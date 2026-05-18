@@ -359,6 +359,24 @@ func (_m *DecisionService) Revise(modelPath string, original *madr.Decision) (*m
 	return r0, r1
 }
 
+// Supersede provides a mock function with given fields: modelPath, newDecision, oldDecision, rationale
+func (_m *DecisionService) Supersede(modelPath string, newDecision *madr.Decision, oldDecision *madr.Decision, rationale string) error {
+	ret := _m.Called(modelPath, newDecision, oldDecision, rationale)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Supersede")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, *madr.Decision, *madr.Decision, string) error); ok {
+		r0 = rf(modelPath, newDecision, oldDecision, rationale)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Tag provides a mock function with given fields: modelPath, _a1, tag
 func (_m *DecisionService) Tag(modelPath string, _a1 *madr.Decision, tag string) error {
 	ret := _m.Called(modelPath, _a1, tag)

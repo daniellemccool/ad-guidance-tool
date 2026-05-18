@@ -19,3 +19,7 @@ type ModelMerge interface {
 type ModelValidate interface {
 	Validate(modelPath string) error
 }
+
+type ModelMigrate interface {
+	Migrate(modelPath string, dryRun bool) error
+}

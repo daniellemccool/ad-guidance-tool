@@ -80,7 +80,9 @@ After `adg comment`, the frontmatter grows a `comments:` list and a `## Comments
 | `edit --id <id> --from-stdin\|--from-file <path> [--force]` | Replace the decision body. Status-gated: non-proposed decisions require `--force`. |
 | `comment --id <id> --author <name> --text <text>` | Append a comment. Text is preserved verbatim. |
 | `decide --id <id> --option <name-or-number> [--rationale <text>]` | Set status to accepted and write the MADR "Chosen option: ..." line. |
-| `link --source <id> --target <id> --tag <name> [--reverse-tag <name>]` | Add a custom link. Use a future `supersede` command for supersession. |
+| `link --source <id> --target <id> --tag <name> [--reverse-tag <name>]` | Add a custom link. Supersession has its own command — see below. |
+| `supersede --new <id> --old <id> [--rationale <text>]` | Mark `new` as superseding `old`. Bidirectional: writes `Supersedes` list on new and `superseded by ADR-N` status on old. Auto-promotes new to `accepted`. |
+| `migrate [--dry-run]` | Convert upstream ADG files (`AD\d{4}-slug.md` with HTML anchors and `status: open\|decided`) into MADR shape. In-place; idempotent. |
 | `tag --id <id> --tag <name>` | Add a tag. |
 | `revise --id <id>` | Clone the decision into a new draft. |
 | `view --id <id> [--context\|--drivers\|--options\|--outcome\|--comments]` | Print full body or selected sections. |
@@ -161,7 +163,25 @@ Config lives at `~/.adgconfig.yaml` by default; override with `--config-path`.
 
 ## Migrating from upstream ADG
 
-Files using the legacy ADG format are refused at read time with an error pointing to `adg migrate`. The migrate command lands in a follow-up PR — until then, ADRs need conversion by hand or by keeping a separate model.
+If you have an existing model written by the upstream tool, `adg migrate` converts it in place:
+
+```sh
+adg migrate --model docs/decisions --dry-run    # preview only
+adg migrate --model docs/decisions               # rewrite
+```
+
+What changes per file:
+
+- Filename: `AD0001-slug.md` → `0001-slug.md` (drops the `AD` prefix).
+- Frontmatter: drops `adr_id`; drops the slug-style `title`; maps `status: open` → `proposed`, `status: decided` → `accepted` (with `legacy-outcome: true` to bypass the strict Chosen-option check); preserves `tags`, `links`, and `comments`.
+- Body: strips every `<a name="..."></a>` HTML anchor; renames `Question` → `Context and Problem Statement`, `Options` → `Considered Options` (numbered → bulletized), `Criteria` → `Decision Drivers`, `Outcome` → `Decision Outcome`; removes the `## Comments` H2 since comments are regenerated from frontmatter on every save.
+- Comments: best-effort recovery — the §A.1 bug stored placeholder indices in frontmatter while the real prose lived in body anchor blocks. Migrate pairs them by index and pulls the text into `Comments[N].Text`. If an entry can't be paired, a placeholder `(unrecoverable: legacy comment placeholder "N")` is written so `adg validate` flags it for manual repair.
+
+Migrate is faithful: it doesn't synthesize sections the source didn't have. Legacy ADRs in `status: open` had no `## Outcome` section, so after migration they'll report `missing required section: Decision Outcome` from `adg validate` — that's the design. Add the section by hand or via `adg edit --from-stdin`.
+
+`adg migrate` is idempotent: running it again does nothing because already-migrated files don't match the legacy markers.
+
+> **Heads up:** inline body links like `[ADR-0002](AD0002-foo.md)` break after migration because the target filename changes. `adg migrate` doesn't rewrite link targets — grep your corpus for `AD\d{4}-` after migration if you used filename-based internal links.
 
 ## Contributing
 

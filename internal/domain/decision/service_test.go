@@ -2,6 +2,7 @@ package decision
 
 import (
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -352,6 +353,81 @@ Chosen option: "A".
 	err := service.ReplaceBody("model", d, bodyNoH1, false)
 	assert.NoError(t, err)
 	assert.Equal(t, "Original", d.Title)
+}
+
+func TestSupersede_HappyPath(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	newD := &Decision{ID: "0002", Status: "proposed"}
+	oldD := &Decision{ID: "0001", Status: "accepted"}
+
+	mockRepo.On("LoadBody", "model", "0002").Return("body new", nil)
+	mockRepo.On("LoadBody", "model", "0001").Return("body old", nil)
+	mockRepo.On("Save", "model", mock.MatchedBy(func(d *Decision) bool {
+		return d.ID == "0002" && d.Status == "accepted" && slices.Contains(d.Supersedes, "0001")
+	}), "body new").Return(nil)
+	mockRepo.On("Save", "model", mock.MatchedBy(func(d *Decision) bool {
+		return d.ID == "0001" && d.Status == "superseded by ADR-0002"
+	}), "body old").Return(nil)
+
+	err := service.Supersede("model", newD, oldD, "")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "accepted", newD.Status)
+	assert.Contains(t, newD.Supersedes, "0001")
+	assert.Equal(t, "superseded by ADR-0002", oldD.Status)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestSupersede_RefusesSelf(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	d := &Decision{ID: "0001", Status: "proposed"}
+
+	err := service.Supersede("model", d, d, "")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot supersede itself")
+	mockRepo.AssertNotCalled(t, "Save")
+}
+
+func TestSupersede_IdempotentOnRepeat(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	newD := &Decision{ID: "0002", Status: "accepted", Supersedes: []string{"0001"}}
+	oldD := &Decision{ID: "0001", Status: "superseded by ADR-0002"}
+
+	mockRepo.On("LoadBody", "model", "0002").Return("nb", nil)
+	mockRepo.On("LoadBody", "model", "0001").Return("ob", nil)
+	mockRepo.On("Save", "model", mock.Anything, "nb").Return(nil)
+	mockRepo.On("Save", "model", mock.Anything, "ob").Return(nil)
+
+	err := service.Supersede("model", newD, oldD, "")
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"0001"}, newD.Supersedes, "Supersedes should not duplicate on repeat")
+}
+
+func TestSupersede_AppendsRationaleToNewOutcome(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	newD := &Decision{ID: "0002", Status: "accepted"}
+	oldD := &Decision{ID: "0001", Status: "accepted"}
+
+	newBody := "# T\n\n## Decision Outcome\n\nChosen option: \"X\".\n"
+	mockRepo.On("LoadBody", "model", "0002").Return(newBody, nil)
+	mockRepo.On("LoadBody", "model", "0001").Return("ob", nil)
+	mockRepo.On("Save", "model", mock.Anything, mock.MatchedBy(func(body string) bool {
+		return strings.Contains(body, "Supersedes ADR-0001: better approach found")
+	})).Return(nil)
+	mockRepo.On("Save", "model", mock.Anything, "ob").Return(nil)
+
+	err := service.Supersede("model", newD, oldD, "better approach found")
+	assert.NoError(t, err)
 }
 
 func TestCopy_DelegatesToRepo(t *testing.T) {

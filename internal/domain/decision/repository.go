@@ -36,4 +36,22 @@ type DecisionRepository interface {
 	// Copy duplicates a decision file from one model directory to another,
 	// preserving subdirectory structure.
 	Copy(srcPath, dstPath, decisionID string) error
+
+	// MigrateLegacyFiles walks modelPath for files in the upstream ADG
+	// format (filename `AD\d{4}-slug.md` or legacy markers in content) and
+	// converts each to MADR shape, renaming `AD\d{4}-slug.md` to
+	// `\d{4}-slug.md`. When dryRun is true, no files are written or
+	// removed; the returned steps describe what would happen.
+	MigrateLegacyFiles(modelPath string, dryRun bool) ([]MigrationStep, error)
+}
+
+// MigrationStep is one file's outcome from MigrateLegacyFiles. Error is
+// non-nil iff the per-file migration failed (in which case the original
+// file is left untouched). DryRun=true means OldPath has not been removed
+// and NewPath has not been written.
+type MigrationStep struct {
+	OldPath string
+	NewPath string
+	DryRun  bool
+	Error   error
 }

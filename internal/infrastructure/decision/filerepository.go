@@ -196,6 +196,113 @@ func (r *FileDecisionRepository) FindDecisionFile(modelPath, id string) (string,
 	return found, nil
 }
 
+// MigrateLegacyFiles implements DecisionRepository.MigrateLegacyFiles.
+// It scans modelPath for legacy ADG files (filename pattern AD\d{4}-slug.md
+// or legacy markers in content), converts each via madr.MigrateLegacy,
+// writes the new `\d{4}-slug.md` file, and removes the old. Files that
+// don't match the legacy pattern are skipped silently.
+//
+// Atomicity is per-file: the new file is written before the old is removed
+// so a partial failure leaves a viable on-disk state for `adg validate` to
+// flag. If migration of one file errors, the walk continues; the error
+// is recorded in the returned step and the original file is not touched.
+//
+// In dry-run mode, no filesystem writes happen; the returned steps still
+// describe the intended OldPath→NewPath rename.
+func (r *FileDecisionRepository) MigrateLegacyFiles(modelPath string, dryRun bool) ([]domain.MigrationStep, error) {
+	var steps []domain.MigrationStep
+	err := filepath.WalkDir(modelPath, func(path string, e fs.DirEntry, err error) error {
+		if err != nil || e.IsDir() {
+			return err
+		}
+		if filepath.Ext(e.Name()) != ".md" {
+			return nil
+		}
+		content, readErr := os.ReadFile(path)
+		if readErr != nil {
+			steps = append(steps, domain.MigrationStep{OldPath: path, DryRun: dryRun, Error: readErr})
+			return nil
+		}
+		if !madr.IsLegacyADG(path, content) {
+			return nil
+		}
+
+		// Derive the new filename from the legacy frontmatter's `title`
+		// field (which is the slug) or the file's NNNN prefix.
+		d, body, mErr := madr.MigrateLegacy(content)
+		if mErr != nil {
+			steps = append(steps, domain.MigrationStep{OldPath: path, DryRun: dryRun, Error: mErr})
+			return nil
+		}
+
+		// Extract NNNN from the legacy filename: `AD0001-foo.md` -> "0001".
+		base := e.Name()
+		id := legacyIDFromFilename(base)
+		if id == "" {
+			steps = append(steps, domain.MigrationStep{OldPath: path, DryRun: dryRun, Error: fmt.Errorf("could not extract ID from filename %s", base)})
+			return nil
+		}
+		d.ID = id
+
+		slug, sErr := slugify(d.Title)
+		if sErr != nil {
+			steps = append(steps, domain.MigrationStep{OldPath: path, DryRun: dryRun, Error: sErr})
+			return nil
+		}
+		d.Slug = slug
+
+		newName := fmt.Sprintf("%s-%s.md", id, slug)
+		newPath := filepath.Join(filepath.Dir(path), newName)
+
+		step := domain.MigrationStep{OldPath: path, NewPath: newPath, DryRun: dryRun}
+		if dryRun {
+			steps = append(steps, step)
+			return nil
+		}
+
+		out, rErr := madr.RenderFile(d, body)
+		if rErr != nil {
+			step.Error = rErr
+			steps = append(steps, step)
+			return nil
+		}
+		if wErr := os.WriteFile(newPath, []byte(out), 0o644); wErr != nil {
+			step.Error = wErr
+			steps = append(steps, step)
+			return nil
+		}
+		if newPath != path {
+			if rmErr := os.Remove(path); rmErr != nil {
+				step.Error = rmErr
+				steps = append(steps, step)
+				return nil
+			}
+		}
+		steps = append(steps, step)
+		return nil
+	})
+	if err != nil {
+		return steps, err
+	}
+	return steps, nil
+}
+
+// legacyIDFromFilename pulls the NNNN out of either `AD0001-x.md` or
+// `0001-x.md`. Returns "" if the filename doesn't match.
+func legacyIDFromFilename(name string) string {
+	// Strip the AD prefix if present.
+	stripped := strings.TrimPrefix(name, "AD")
+	if len(stripped) < 5 || stripped[4] != '-' {
+		return ""
+	}
+	for i := 0; i < 4; i++ {
+		if stripped[i] < '0' || stripped[i] > '9' {
+			return ""
+		}
+	}
+	return stripped[:4]
+}
+
 func (r *FileDecisionRepository) Copy(srcPath, dstPath, decisionID string) error {
 	srcFile, err := r.FindDecisionFile(srcPath, decisionID)
 	if err != nil {

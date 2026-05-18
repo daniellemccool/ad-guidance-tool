@@ -48,3 +48,7 @@ type DecisionRevise interface {
 type DecisionTag interface {
 	Tagged(decisionID string, tags []string)
 }
+
+type DecisionSupersede interface {
+	Superseded(newID, oldID string)
+}

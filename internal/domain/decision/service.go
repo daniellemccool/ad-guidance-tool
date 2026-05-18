@@ -37,6 +37,7 @@ type DecisionService interface {
 	Revise(modelPath string, original *Decision) (*Decision, error)
 	Copy(sourceModelPath, targetPath, decisionID string) error
 	Comment(modelPath string, decision *Decision, author, text string) error
+	Supersede(modelPath string, newDecision, oldDecision *Decision, rationale string) error
 }
 
 type DecisionServiceImplementation struct {
@@ -334,6 +335,67 @@ func (s *DecisionServiceImplementation) Comment(modelPath string, d *Decision, a
 		return err
 	}
 	return s.repo.Save(modelPath, d, body)
+}
+
+// Supersede records that newDecision replaces oldDecision. Both files are
+// rewritten in a single call:
+//   - oldDecision.Status becomes `superseded by ADR-<newID>`.
+//   - oldDecision.ID is appended to newDecision.Supersedes if not already
+//     present.
+//   - If newDecision.Status is not "accepted", it is promoted to "accepted"
+//     because superseding is the act of accepting a replacement.
+//   - If rationale is non-empty, a paragraph is appended to newDecision's
+//     Decision Outcome explaining the supersession (informational; the
+//     Supersedes frontmatter list is the source of truth).
+//
+// Refuses self-supersession (new.ID == old.ID). Chains (A→B→C) are allowed.
+// The bidirectional integrity that this writes is what
+// ModelService.Validate checks via supersession forward+reverse rules.
+func (s *DecisionServiceImplementation) Supersede(modelPath string, newD, oldD *Decision, rationale string) error {
+	if newD.ID == oldD.ID {
+		return fmt.Errorf("a decision cannot supersede itself")
+	}
+
+	// Promote new to accepted if it isn't already. When promoting from a
+	// pre-decided state, also set legacy-outcome=true so the validator
+	// doesn't demand a `Chosen option: "X"` line — a supersession decision
+	// records its choice via the Supersedes list, not the Outcome template.
+	if newD.Status != "accepted" {
+		newD.Status = "accepted"
+		newD.LegacyOutcome = true
+	}
+	// Append old.ID to new.Supersedes (idempotent).
+	if !slices.Contains(newD.Supersedes, oldD.ID) {
+		newD.Supersedes = append(newD.Supersedes, oldD.ID)
+	}
+	oldD.Status = fmt.Sprintf("superseded by ADR-%s", newD.ID)
+
+	today := time.Now().Format("2006-01-02")
+	newD.Date = today
+	oldD.Date = today
+
+	// Load both bodies first so a read failure aborts before any write.
+	newBody, err := s.repo.LoadBody(modelPath, newD.ID)
+	if err != nil {
+		return fmt.Errorf("failed to load new decision body: %w", err)
+	}
+	oldBody, err := s.repo.LoadBody(modelPath, oldD.ID)
+	if err != nil {
+		return fmt.Errorf("failed to load old decision body: %w", err)
+	}
+
+	if rationale != "" {
+		newBody = appendToSection(newBody, "Decision Outcome",
+			fmt.Sprintf("Supersedes ADR-%s: %s\n", oldD.ID, rationale))
+	}
+
+	if err := s.repo.Save(modelPath, newD, newBody); err != nil {
+		return fmt.Errorf("failed to save new decision: %w", err)
+	}
+	if err := s.repo.Save(modelPath, oldD, oldBody); err != nil {
+		return fmt.Errorf("failed to save old decision: %w", err)
+	}
+	return nil
 }
 
 // Helpers

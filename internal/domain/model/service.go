@@ -15,6 +15,7 @@ type ModelService interface {
 	CreateModel(modelPath string) error
 	Exists(modelPath string) bool
 	Validate(modelPath string) ([]ValidationIssue, error)
+	Migrate(modelPath string, dryRun bool) ([]decisiondomain.MigrationStep, error)
 }
 
 // ValidationIssue is one finding reported by Validate. Issues are grouped by
@@ -42,6 +43,13 @@ func (s *ModelServiceImplementation) CreateModel(modelPath string) error {
 
 func (s *ModelServiceImplementation) Exists(modelPath string) bool {
 	return s.modelRepo.Exists(modelPath)
+}
+
+// Migrate delegates to the repository, which walks modelPath and converts
+// each legacy ADG file to MADR shape in place. dryRun=true returns the
+// intended steps without touching the filesystem.
+func (s *ModelServiceImplementation) Migrate(modelPath string, dryRun bool) ([]decisiondomain.MigrationStep, error) {
+	return s.decisionRepo.MigrateLegacyFiles(modelPath, dryRun)
 }
 
 var (

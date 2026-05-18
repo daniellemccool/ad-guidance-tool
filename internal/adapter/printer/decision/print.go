@@ -1,21 +1,25 @@
 package decision
 
 import (
-	"adg/internal/application/outputport"
-	"adg/internal/domain/decision/madr"
-
 	"fmt"
 	"sort"
+
+	printer "adg/internal/adapter/printer"
+	"adg/internal/application/outputport"
+	"adg/internal/domain/decision/madr"
 )
 
 // PrintDecisionsPresenter renders ADR bodies for the `adg view` command.
-// The section names below are MADR canonical (no more configurable headers);
-// in PR 1b this printer accepts pre-loaded body text and uses madr.ParseBody to
-// pluck out individual sections when `--section` filtering is requested.
-type PrintDecisionsPresenter struct{}
+// view's purpose is to emit ADR content, so everything goes to stdout —
+// status messages aren't part of the model here. Parse failures on a
+// specific decision still print to stdout (alongside the other decisions)
+// because they describe the file the user asked to see.
+type PrintDecisionsPresenter struct {
+	s printer.Streams
+}
 
-func NewPrintPresenter() *PrintDecisionsPresenter {
-	return &PrintDecisionsPresenter{}
+func NewPrintPresenter(s printer.Streams) *PrintDecisionsPresenter {
+	return &PrintDecisionsPresenter{s: s}
 }
 
 // Printed implements outputport.DecisionPrint. `sections` filters by canonical
@@ -27,16 +31,16 @@ func (p *PrintDecisionsPresenter) Printed(bodies []outputport.DecisionBody, sect
 	})
 
 	for _, b := range bodies {
-		fmt.Printf("===== Decision %s =====\n\n", b.ID)
+		fmt.Fprintf(p.s.Out, "===== Decision %s =====\n\n", b.ID)
 
 		if len(sections) == 0 {
-			fmt.Println(b.Body)
+			fmt.Fprintln(p.s.Out, b.Body)
 			continue
 		}
 
 		parsed, err := madr.ParseBody(b.Body)
 		if err != nil {
-			fmt.Printf("(failed to parse body: %v)\n", err)
+			fmt.Fprintf(p.s.Out, "(failed to parse body: %v)\n", err)
 			continue
 		}
 		for _, key := range []string{"context", "drivers", "options", "outcome", "pros-cons", "more", "comments"} {
@@ -44,7 +48,7 @@ func (p *PrintDecisionsPresenter) Printed(bodies []outputport.DecisionBody, sect
 				continue
 			}
 			if sec, ok := parsed.Sections[key]; ok {
-				fmt.Println(sec)
+				fmt.Fprintln(p.s.Out, sec)
 			}
 		}
 	}

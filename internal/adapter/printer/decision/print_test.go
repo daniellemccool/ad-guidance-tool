@@ -1,9 +1,11 @@
 package decision
 
 import (
-	"adg/internal/application/outputport"
 	"strings"
 	"testing"
+
+	"adg/internal/adapter/printer/printertest"
+	"adg/internal/application/outputport"
 )
 
 const sampleBody = `# Decision Title
@@ -28,17 +30,16 @@ Chosen option: "Option A", because reasons.
 Looks good.
 `
 
-func TestPrinted_NoFilter_PrintsFullBody(t *testing.T) {
-	presenter := NewPrintPresenter()
+func TestPrinted_NoFilter_PrintsFullBodyToStdout(t *testing.T) {
+	s, out, _ := printertest.Capture(false)
+	presenter := NewPrintPresenter(s)
 
 	bodies := []outputport.DecisionBody{
 		{ID: "0002", Body: sampleBody},
 		{ID: "0001", Body: sampleBody},
 	}
 
-	output := captureOutput(func() {
-		presenter.Printed(bodies, nil)
-	})
+	presenter.Printed(bodies, nil)
 
 	for _, expected := range []string{
 		"===== Decision 0001 =====",
@@ -47,35 +48,34 @@ func TestPrinted_NoFilter_PrintsFullBody(t *testing.T) {
 		"## Considered Options",
 		"## Decision Outcome",
 	} {
-		if !strings.Contains(output, expected) {
-			t.Errorf("expected output to contain %q\n%s", expected, output)
+		if !strings.Contains(out.String(), expected) {
+			t.Errorf("expected stdout to contain %q\n%s", expected, out.String())
 		}
 	}
 
 	// IDs should be sorted ascending.
-	if strings.Index(output, "Decision 0001") > strings.Index(output, "Decision 0002") {
-		t.Errorf("expected 0001 to print before 0002:\n%s", output)
+	if strings.Index(out.String(), "Decision 0001") > strings.Index(out.String(), "Decision 0002") {
+		t.Errorf("expected 0001 to print before 0002:\n%s", out.String())
 	}
 }
 
 func TestPrinted_FiltersBySection(t *testing.T) {
-	presenter := NewPrintPresenter()
+	s, out, _ := printertest.Capture(false)
+	presenter := NewPrintPresenter(s)
 
 	bodies := []outputport.DecisionBody{
 		{ID: "0001", Body: sampleBody},
 	}
 
-	output := captureOutput(func() {
-		presenter.Printed(bodies, map[string]bool{"context": true, "outcome": true})
-	})
+	presenter.Printed(bodies, map[string]bool{"context": true, "outcome": true})
 
-	if !strings.Contains(output, "What should we do?") {
-		t.Errorf("expected Context section, got:\n%s", output)
+	if !strings.Contains(out.String(), "What should we do?") {
+		t.Errorf("expected Context section, got:\n%s", out.String())
 	}
-	if !strings.Contains(output, "Chosen option:") {
-		t.Errorf("expected Outcome section, got:\n%s", output)
+	if !strings.Contains(out.String(), "Chosen option:") {
+		t.Errorf("expected Outcome section, got:\n%s", out.String())
 	}
-	if strings.Contains(output, "* Option A") {
-		t.Errorf("Considered Options should not be printed when filtered out:\n%s", output)
+	if strings.Contains(out.String(), "* Option A") {
+		t.Errorf("Considered Options should not be printed when filtered out:\n%s", out.String())
 	}
 }

@@ -1,16 +1,19 @@
 package decision
 
 import (
-	"fmt"
 	"strings"
+
+	printer "adg/internal/adapter/printer"
 )
 
-type TagDecisionPresenter struct{}
+type TagDecisionPresenter struct {
+	s printer.Streams
+}
 
-func NewTagPresenter() *TagDecisionPresenter {
-	return &TagDecisionPresenter{}
+func NewTagPresenter(s printer.Streams) *TagDecisionPresenter {
+	return &TagDecisionPresenter{s: s}
 }
 
 func (p *TagDecisionPresenter) Tagged(decisionID string, tags []string) {
-	fmt.Printf("Tags [%s] added to decision %s\n", strings.Join(tags, ", "), decisionID)
+	p.s.Status("Tags [%s] added to decision %s\n", strings.Join(tags, ", "), decisionID)
 }

@@ -1,13 +1,17 @@
 package decision
 
-import "fmt"
+import (
+	printer "adg/internal/adapter/printer"
+)
 
-type CommentDecisionPresenter struct{}
+type CommentDecisionPresenter struct {
+	s printer.Streams
+}
 
-func NewCommentPresenter() *CommentDecisionPresenter {
-	return &CommentDecisionPresenter{}
+func NewCommentPresenter(s printer.Streams) *CommentDecisionPresenter {
+	return &CommentDecisionPresenter{s: s}
 }
 
 func (p *CommentDecisionPresenter) Commented(decisionID, author, comment string) {
-	fmt.Printf("Comment added by %s to decision %s: \"%s\"\n", author, decisionID, comment)
+	p.s.Status("Comment added by %s to decision %s: %q\n", author, decisionID, comment)
 }

@@ -1,31 +1,24 @@
 package model
 
 import (
-	"bytes"
-	"io"
-	"os"
 	"testing"
+
+	"adg/internal/adapter/printer/printertest"
 )
 
-func TestImportModelPresenter_Imported(t *testing.T) {
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+func TestImportModelPresenter_StatusOnStderr(t *testing.T) {
+	s, out, err := printertest.Capture(false)
+	presenter := NewImportPresenter(s)
 
-	p := NewImportPresenter()
-	err := p.Imported("source-model", "target-model", 5)
-
-	w.Close()
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
-	os.Stdout = oldStdout
-
-	expectedOutput := "Successfully imported model source-model with 5 decisions to: target-model\n"
-	if got := buf.String(); got != expectedOutput {
-		t.Errorf("unexpected output:\nexpected: %q\ngot: %q", expectedOutput, got)
+	if e := presenter.Imported("source-model", "target-model", 5); e != nil {
+		t.Errorf("Imported returned error: %v", e)
 	}
 
-	if err != nil {
-		t.Errorf("expected nil error, got: %v", err)
+	if out.String() != "" {
+		t.Errorf("stdout should be empty; got %q", out.String())
+	}
+	expected := "Successfully imported model source-model with 5 decisions to: target-model\n"
+	if got := err.String(); got != expected {
+		t.Errorf("stderr = %q, want %q", got, expected)
 	}
 }

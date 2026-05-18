@@ -1,13 +1,17 @@
 package decision
 
-import "fmt"
+import (
+	printer "adg/internal/adapter/printer"
+)
 
-type DecidePresenter struct{}
+type DecidePresenter struct {
+	s printer.Streams
+}
 
-func NewDecidePresenter() *DecidePresenter {
-	return &DecidePresenter{}
+func NewDecidePresenter(s printer.Streams) *DecidePresenter {
+	return &DecidePresenter{s: s}
 }
 
 func (p *DecidePresenter) Decided(decisionID string) {
-	fmt.Printf("Decision %s has been marked as decided.\n", decisionID)
+	p.s.Status("Decision %s has been marked as decided.\n", decisionID)
 }

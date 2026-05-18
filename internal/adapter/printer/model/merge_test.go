@@ -1,30 +1,24 @@
 package model
 
 import (
-	"bytes"
-	"io"
-	"os"
 	"testing"
+
+	"adg/internal/adapter/printer/printertest"
 )
 
-func TestMergeModelsPresenter_Merged(t *testing.T) {
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+func TestMergeModelsPresenter_StatusOnStderr(t *testing.T) {
+	s, out, err := printertest.Capture(false)
+	presenter := NewMergePresenter(s)
 
-	p := NewMergePresenter()
-	err := p.Merged("modelA", "modelB", "target", 5)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	if e := presenter.Merged("modelA", "modelB", "target", 5); e != nil {
+		t.Errorf("Merged returned error: %v", e)
 	}
 
-	w.Close()
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
-	os.Stdout = oldStdout
-
+	if out.String() != "" {
+		t.Errorf("stdout should be empty; got %q", out.String())
+	}
 	expected := "Successfully merged 5 decisions from models modelA and modelB to new directory: target\n"
-	if got := buf.String(); got != expected {
-		t.Errorf("expected output %q, got %q", expected, got)
+	if got := err.String(); got != expected {
+		t.Errorf("stderr = %q, want %q", got, expected)
 	}
 }

@@ -1,26 +1,32 @@
 package decision
 
 import (
-	domain "adg/internal/domain/decision"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
 
+	printer "adg/internal/adapter/printer"
+	domain "adg/internal/domain/decision"
+
 	"gopkg.in/yaml.v3"
 )
 
-type ListDecisionsPresenter struct{}
-
-func NewListPresenter() *ListDecisionsPresenter {
-	return &ListDecisionsPresenter{}
+type ListDecisionsPresenter struct {
+	s printer.Streams
 }
 
+func NewListPresenter(s printer.Streams) *ListDecisionsPresenter {
+	return &ListDecisionsPresenter{s: s}
+}
+
+// Listed emits the rendered list to stdout (json/yaml/md/simple). Render
+// failures and the empty-model notice go to stderr so they don't pollute
+// piped output.
 func (p *ListDecisionsPresenter) Listed(decisions []domain.Decision, format string) {
 	if len(decisions) == 0 {
-		fmt.Println("Model is empty, no decisions to list.")
+		p.s.Status("Model is empty, no decisions to list.\n")
 		return
 	}
 
@@ -41,11 +47,11 @@ func (p *ListDecisionsPresenter) Listed(decisions []domain.Decision, format stri
 	}
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error rendering decisions: %v\n", err)
+		p.s.Errf("error rendering decisions: %v\n", err)
 		return
 	}
 
-	fmt.Println(output)
+	fmt.Fprintln(p.s.Out, output)
 }
 
 func sortDecisionsByID(decisions []domain.Decision) {

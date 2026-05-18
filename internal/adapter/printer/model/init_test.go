@@ -1,27 +1,31 @@
 package model
 
 import (
-	"bytes"
-	"io"
-	"os"
 	"testing"
+
+	"adg/internal/adapter/printer/printertest"
 )
 
-func TestInitModelPresenter_Initialized(t *testing.T) {
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+func TestInitModelPresenter_StatusOnStderr(t *testing.T) {
+	s, out, err := printertest.Capture(false)
+	presenter := NewInitPresenter(s)
 
-	p := NewInitPresenter()
-	p.Initialized("test/model")
+	presenter.Initialized("test/model")
 
-	w.Close()
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
-	os.Stdout = oldStdout
-
+	if out.String() != "" {
+		t.Errorf("stdout should be empty; got %q", out.String())
+	}
 	expected := "Successfully created model directory: test/model\n"
-	if got := buf.String(); got != expected {
-		t.Errorf("expected output %q, got %q", expected, got)
+	if got := err.String(); got != expected {
+		t.Errorf("stderr = %q, want %q", got, expected)
+	}
+}
+
+func TestInitModelPresenter_Quiet_Suppresses(t *testing.T) {
+	s, _, err := printertest.Capture(true)
+	presenter := NewInitPresenter(s)
+	presenter.Initialized("anywhere")
+	if err.String() != "" {
+		t.Errorf("stderr should be empty under --quiet; got %q", err.String())
 	}
 }

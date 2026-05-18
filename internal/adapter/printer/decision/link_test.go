@@ -1,43 +1,39 @@
 package decision
 
 import (
-	"fmt"
+	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"adg/internal/adapter/printer/printertest"
 )
 
 func TestLinked_WithReverseTag(t *testing.T) {
-	presenter := NewLinkPresenter()
-	sourceID := "001"
-	targetID := "002"
-	tag := "depends on"
-	reverseTag := "supports"
+	s, out, err := printertest.Capture(false)
+	presenter := NewLinkPresenter(s)
 
-	output := captureOutput(func() {
-		presenter.Linked(sourceID, targetID, tag, reverseTag)
-	})
+	presenter.Linked("001", "002", "depends on", "supports")
 
-	expected1 := fmt.Sprintf("Link added: %s →[%s]→ %s\n", sourceID, tag, targetID)
-	expected2 := fmt.Sprintf("Reverse link added: %s →[%s]→ %s\n", targetID, reverseTag, sourceID)
-
-	assert.Contains(t, output, expected1)
-	assert.Contains(t, output, expected2)
+	if out.String() != "" {
+		t.Errorf("stdout should be empty; got %q", out.String())
+	}
+	if !strings.Contains(err.String(), "Link added: 001 →[depends on]→ 002") {
+		t.Errorf("stderr missing forward link: %q", err.String())
+	}
+	if !strings.Contains(err.String(), "Reverse link added: 002 →[supports]→ 001") {
+		t.Errorf("stderr missing reverse link: %q", err.String())
+	}
 }
 
 func TestLinked_WithoutReverseTag(t *testing.T) {
-	presenter := NewLinkPresenter()
-	sourceID := "003"
-	targetID := "004"
-	tag := "blocks"
-	reverseTag := ""
+	s, _, err := printertest.Capture(false)
+	presenter := NewLinkPresenter(s)
 
-	output := captureOutput(func() {
-		presenter.Linked(sourceID, targetID, tag, reverseTag)
-	})
+	presenter.Linked("003", "004", "blocks", "")
 
-	expected := fmt.Sprintf("Link added: %s →[%s]→ %s\n", sourceID, tag, targetID)
-
-	assert.Equal(t, expected, output)
-	assert.NotContains(t, output, "Reverse link added")
+	if !strings.Contains(err.String(), "Link added: 003 →[blocks]→ 004") {
+		t.Errorf("stderr missing forward link: %q", err.String())
+	}
+	if strings.Contains(err.String(), "Reverse link added") {
+		t.Errorf("should not have reverse link; got %q", err.String())
+	}
 }

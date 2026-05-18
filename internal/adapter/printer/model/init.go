@@ -1,13 +1,17 @@
 package model
 
-import "fmt"
+import (
+	printer "adg/internal/adapter/printer"
+)
 
-type InitModelPresenter struct{}
+type InitModelPresenter struct {
+	s printer.Streams
+}
 
-func NewInitPresenter() *InitModelPresenter {
-	return &InitModelPresenter{}
+func NewInitPresenter(s printer.Streams) *InitModelPresenter {
+	return &InitModelPresenter{s: s}
 }
 
 func (p *InitModelPresenter) Initialized(modelPath string) {
-	fmt.Printf("Successfully created model directory: %s\n", modelPath)
+	p.s.Status("Successfully created model directory: %s\n", modelPath)
 }

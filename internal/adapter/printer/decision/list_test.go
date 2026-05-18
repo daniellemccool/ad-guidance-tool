@@ -1,44 +1,45 @@
 package decision
 
 import (
-	"adg/internal/domain/decision"
 	"strings"
 	"testing"
+
+	"adg/internal/adapter/printer/printertest"
+	"adg/internal/domain/decision"
 )
 
 func TestListed_JSON(t *testing.T) {
-	presenter := NewListPresenter()
+	s, out, _ := printertest.Capture(false)
+	presenter := NewListPresenter(s)
 	decisions := []decision.Decision{
 		{ID: "0002", Title: "Decision B", Status: "proposed"},
 		{ID: "0001", Title: "Decision A", Status: "accepted"},
 	}
 
-	output := captureOutput(func() {
-		presenter.Listed(decisions, "json")
-	})
+	presenter.Listed(decisions, "json")
 
-	if !strings.Contains(output, `"Title": "Decision A"`) || !strings.Contains(output, `"Title": "Decision B"`) {
-		t.Errorf("JSON output missing expected content:\n%s", output)
+	if !strings.Contains(out.String(), `"Title": "Decision A"`) || !strings.Contains(out.String(), `"Title": "Decision B"`) {
+		t.Errorf("stdout JSON missing expected content:\n%s", out.String())
 	}
 }
 
 func TestListed_YAML(t *testing.T) {
-	presenter := NewListPresenter()
+	s, out, _ := printertest.Capture(false)
+	presenter := NewListPresenter(s)
 	decisions := []decision.Decision{
 		{ID: "0002", Title: "Decision B", Status: "proposed"},
 	}
 
-	output := captureOutput(func() {
-		presenter.Listed(decisions, "yaml")
-	})
+	presenter.Listed(decisions, "yaml")
 
-	if !strings.Contains(output, "title: Decision B") {
-		t.Errorf("YAML output missing expected content:\n%s", output)
+	if !strings.Contains(out.String(), "title: Decision B") {
+		t.Errorf("stdout YAML missing expected content:\n%s", out.String())
 	}
 }
 
 func TestListed_Markdown(t *testing.T) {
-	presenter := NewListPresenter()
+	s, out, _ := printertest.Capture(false)
+	presenter := NewListPresenter(s)
 	decisions := []decision.Decision{
 		{
 			ID: "0001", Title: "Decision A", Status: "proposed",
@@ -50,37 +51,37 @@ func TestListed_Markdown(t *testing.T) {
 		},
 	}
 
-	output := captureOutput(func() {
-		presenter.Listed(decisions, "md")
-	})
+	presenter.Listed(decisions, "md")
 
-	if !strings.Contains(output, "### 0001 - Decision A") || !strings.Contains(output, "- **Supersedes:** 0002") || !strings.Contains(output, "**Related:** 0004") {
-		t.Errorf("Markdown output missing expected content:\n%s", output)
+	if !strings.Contains(out.String(), "### 0001 - Decision A") || !strings.Contains(out.String(), "- **Supersedes:** 0002") || !strings.Contains(out.String(), "**Related:** 0004") {
+		t.Errorf("stdout markdown missing expected content:\n%s", out.String())
 	}
 }
 
 func TestListed_Simple(t *testing.T) {
-	presenter := NewListPresenter()
+	s, out, _ := printertest.Capture(false)
+	presenter := NewListPresenter(s)
 	decisions := []decision.Decision{
 		{ID: "0001", Title: "Simple Decision", Status: "proposed", Tags: []string{"alpha", "beta"}},
 	}
 
-	output := captureOutput(func() {
-		presenter.Listed(decisions, "simple")
-	})
+	presenter.Listed(decisions, "simple")
 
-	if !strings.Contains(output, "0001 [proposed] - Simple Decision : [alpha beta]") {
-		t.Errorf("Simple output format incorrect:\n%s", output)
+	if !strings.Contains(out.String(), "0001 [proposed] - Simple Decision : [alpha beta]") {
+		t.Errorf("stdout simple format incorrect:\n%s", out.String())
 	}
 }
 
-func TestListed_EmptyModel(t *testing.T) {
-	presenter := NewListPresenter()
-	output := captureOutput(func() {
-		presenter.Listed([]decision.Decision{}, "json")
-	})
+func TestListed_EmptyModel_NoticeOnStderr(t *testing.T) {
+	s, out, err := printertest.Capture(false)
+	presenter := NewListPresenter(s)
 
-	if !strings.Contains(output, "Model is empty") {
-		t.Errorf("Empty model message not shown:\n%s", output)
+	presenter.Listed([]decision.Decision{}, "json")
+
+	if out.String() != "" {
+		t.Errorf("stdout should be empty on empty model; got %q", out.String())
+	}
+	if !strings.Contains(err.String(), "Model is empty") {
+		t.Errorf("stderr missing empty-model notice; got %q", err.String())
 	}
 }

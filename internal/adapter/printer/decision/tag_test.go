@@ -3,17 +3,20 @@ package decision
 import (
 	"strings"
 	"testing"
+
+	"adg/internal/adapter/printer/printertest"
 )
 
-func TestTagged(t *testing.T) {
-	presenter := NewTagPresenter()
+func TestTagged_StatusOnStderr(t *testing.T) {
+	s, out, err := printertest.Capture(false)
+	presenter := NewTagPresenter(s)
 
-	output := captureOutput(func() {
-		presenter.Tagged("0001", []string{"critical", "UI"})
-	})
+	presenter.Tagged("0001", []string{"critical", "UI"})
 
-	expected := "Tags [critical, UI] added to decision 0001"
-	if !strings.Contains(output, expected) {
-		t.Errorf("Expected output to contain: %q, but got: %q", expected, output)
+	if out.String() != "" {
+		t.Errorf("stdout should be empty; got %q", out.String())
+	}
+	if !strings.Contains(err.String(), "Tags [critical, UI] added to decision 0001") {
+		t.Errorf("stderr missing status: %q", err.String())
 	}
 }

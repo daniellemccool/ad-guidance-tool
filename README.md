@@ -92,6 +92,24 @@ After `adg comment`, the frontmatter grows a `comments:` list and a `## Comments
 
 Run `adg <command> -h` for full flag details.
 
+## Scripting (stdout / stderr / exit codes)
+
+`adg` follows the usual Unix conventions so it's safe to pipe and script:
+
+- **stdout** carries machine-readable values. `add` writes the new ID (one per line for multi-add); `revise` writes the new ID; `list` and `view` write their rendered output.
+- **stderr** carries human-readable status (`Decision X (0001) added successfully.`) and all errors.
+- **`--quiet`** (global flag) suppresses stderr status messages. Machine values on stdout still flow, and errors on stderr still print.
+
+That means:
+
+```sh
+ID=$(adg add --title "Bounded subprocess output")   # captures 0007
+adg --quiet add --title "X"                          # only the ID prints, nothing else
+adg validate || echo "model has problems"            # exit 1 when issues exist
+```
+
+**Exit codes:** `0` on success; `1` on any failure including validation issues. The validate command prints the issue list to stderr; if you only care about the exit code, redirect with `2>/dev/null`.
+
 ## Validation rules
 
 `adg validate` reports per-decision issues across:

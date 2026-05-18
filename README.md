@@ -161,6 +161,10 @@ adg reset-config       # clear all values
 
 Config lives at `~/.adgconfig.yaml` by default; override with `--config-path`.
 
+## Fork design decisions
+
+The fork's own architectural decisions live in [`docs/fork-design/`](./docs/fork-design/) as a self-hosted MADR model. Each ADR documents a deliberate departure from the upstream tool: MADR-on-disk, no `index.yaml`, comments-in-frontmatter, stdout/stderr split, first-class supersede, replace-mode edit. Read them in order if you want the rationale behind everything in this fork.
+
 ## Migrating from upstream ADG
 
 If you have an existing model written by the upstream tool, `adg migrate` converts it in place:

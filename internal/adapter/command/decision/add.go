@@ -47,7 +47,11 @@ func NewAddCommand(input inputport.DecisionAdd, config domain.ConfigService) *co
 	}
 
 	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the decision model (optional if configured)")
-	cmd.Flags().StringSliceVar(&titles, "title", nil, "One or more titles for new decisions (required)")
+	// StringArrayVar (not StringSliceVar) so a single --title is taken verbatim;
+	// pflag's StringSlice splits on commas, which silently turned a title like
+	// "Store::open, migrate" into two ADRs. Multiple titles still work by
+	// repeating the flag: --title A --title B.
+	cmd.Flags().StringArrayVar(&titles, "title", nil, "One or more titles for new decisions (repeat the flag to add multiple)")
 	cmd.Flags().StringVar(&id, "id", "", "Optional explicit ID (1-9999, zero-padded to 4 digits). Fails if the ID is already taken.")
 
 	return cmd

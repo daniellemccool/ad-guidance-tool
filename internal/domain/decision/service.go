@@ -29,6 +29,7 @@ type DecisionService interface {
 	GetDecisionByTitle(modelPath, title string) (*Decision, error)
 	GetBody(modelPath, id string) (string, error)
 	Edit(modelPath string, decision *Decision, context *string, options *[]string, drivers *string) error
+	ReplaceBody(modelPath string, decision *Decision, newBody string, force bool) error
 	Link(modelPath string, source, target *Decision, forwardTag, reverseTag string) error
 	Tag(modelPath string, decision *Decision, tag string) error
 	FilterDecisions(decisions []Decision, filters map[string][]string) ([]Decision, error)
@@ -117,6 +118,50 @@ func (s *DecisionServiceImplementation) Edit(modelPath string, d *Decision, cont
 
 	d.Date = time.Now().Format("2006-01-02")
 	return s.repo.Save(modelPath, d, body)
+}
+
+// ReplaceBody overwrites the decision's body wholesale with newBody. Use this
+// for LLM-generated or hand-written full-body replacements (`adg edit
+// --from-stdin/--from-file`).
+//
+// Rules:
+//   - Status gating: a decision whose status is not "proposed" (or unset)
+//     requires force=true. The intent is that decided/rejected/deprecated
+//     ADRs are historical record; replacing their body should be deliberate.
+//   - Shape check: the body must parse as MADR and contain the three required
+//     sections (Context and Problem Statement, Considered Options, Decision
+//     Outcome). Refusing here prevents writing a body that `decide`/`validate`
+//     can't reason about later.
+//   - If the body has an H1, the decision's Title is rewritten from it. The
+//     repository regenerates the on-disk filename slug from Title on Save,
+//     so changing the title renames the file (atomically: write-new then
+//     remove-old).
+//   - The body's `## Comments` section, if any, is discarded by the
+//     repository's renderer; comments live in frontmatter.
+func (s *DecisionServiceImplementation) ReplaceBody(modelPath string, d *Decision, newBody string, force bool) error {
+	if d.Status != "" && d.Status != "proposed" && !force {
+		return fmt.Errorf("decision %s has status %q; use --force to replace its body", d.ID, d.Status)
+	}
+
+	parsed, err := madr.ParseBody(newBody)
+	if err != nil {
+		return fmt.Errorf("input does not parse as MADR: %w", err)
+	}
+	for _, req := range []struct{ key, label string }{
+		{"context", "Context and Problem Statement"},
+		{"options", "Considered Options"},
+		{"outcome", "Decision Outcome"},
+	} {
+		if _, ok := parsed.Sections[req.key]; !ok {
+			return fmt.Errorf("input missing required section: %s", req.label)
+		}
+	}
+
+	if parsed.Title != "" {
+		d.Title = parsed.Title
+	}
+	d.Date = time.Now().Format("2006-01-02")
+	return s.repo.Save(modelPath, d, newBody)
 }
 
 func (s *DecisionServiceImplementation) Link(modelPath string, source, target *Decision, tag, reverseTag string) error {

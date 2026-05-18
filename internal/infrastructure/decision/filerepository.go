@@ -51,16 +51,38 @@ func (r *FileDecisionRepository) Create(modelPath, subFolderPath string, d *doma
 	return d, nil
 }
 
+// Save writes a Decision and body to disk. The filename's slug is regenerated
+// from d.Title on every Save; if it differs from the current on-disk filename,
+// the file is renamed (write-new then remove-old, so a partial failure leaves
+// the original intact). d.Slug is updated to reflect the on-disk state.
 func (r *FileDecisionRepository) Save(modelPath string, d *domain.Decision, body string) error {
-	path, err := r.FindDecisionFile(modelPath, d.ID)
+	currentPath, err := r.FindDecisionFile(modelPath, d.ID)
 	if err != nil {
 		return err
 	}
+	slug, err := slugify(d.Title)
+	if err != nil {
+		return err
+	}
+	d.Slug = slug
+
+	desiredName := fmt.Sprintf("%s-%s.md", d.ID, slug)
+	desiredPath := filepath.Join(filepath.Dir(currentPath), desiredName)
+
 	out, err := madr.RenderFile(*d, body)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(out), 0o644)
+
+	if currentPath == desiredPath {
+		return os.WriteFile(currentPath, []byte(out), 0o644)
+	}
+	// Title changed → rename. Write the new file first; if that succeeds,
+	// remove the old. A failure between the two leaves the original intact.
+	if err := os.WriteFile(desiredPath, []byte(out), 0o644); err != nil {
+		return err
+	}
+	return os.Remove(currentPath)
 }
 
 func (r *FileDecisionRepository) LoadById(modelPath, id string) (*domain.Decision, error) {

@@ -232,6 +232,128 @@ func TestFilterDecisions_InvalidIDRange(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid ID range")
 }
 
+// minimal MADR body with the three required sections for ReplaceBody tests.
+const minimalReplaceBody = `# Replacement
+
+## Context and Problem Statement
+
+context here
+
+## Considered Options
+
+* A
+* B
+
+## Decision Outcome
+
+Chosen option: "A".
+`
+
+func TestReplaceBody_Proposed_Success(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	d := &Decision{ID: "0001", Title: "Old", Status: "proposed"}
+	mockRepo.On("Save", "model", mock.MatchedBy(func(saved *Decision) bool {
+		return saved.Title == "Replacement" && saved.Date != ""
+	}), minimalReplaceBody).Return(nil)
+
+	err := service.ReplaceBody("model", d, minimalReplaceBody, false)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "Replacement", d.Title)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestReplaceBody_Accepted_RefusedWithoutForce(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	d := &Decision{ID: "0001", Title: "Old", Status: "accepted"}
+
+	err := service.ReplaceBody("model", d, minimalReplaceBody, false)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "use --force")
+	mockRepo.AssertNotCalled(t, "Save")
+}
+
+func TestReplaceBody_Accepted_AllowedWithForce(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	d := &Decision{ID: "0001", Title: "Old", Status: "accepted"}
+	mockRepo.On("Save", "model", mock.Anything, minimalReplaceBody).Return(nil)
+
+	err := service.ReplaceBody("model", d, minimalReplaceBody, true)
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestReplaceBody_RefusesMissingRequiredSection(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	d := &Decision{ID: "0001", Title: "Old", Status: "proposed"}
+	// Missing Considered Options.
+	bodyWithoutOptions := "# T\n\n## Context and Problem Statement\n\nctx\n\n## Decision Outcome\n\nChosen option: \"X\".\n"
+
+	err := service.ReplaceBody("model", d, bodyWithoutOptions, false)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Considered Options")
+	mockRepo.AssertNotCalled(t, "Save")
+}
+
+// TestReplaceBody_PreservesExistingFrontmatterComments locks in the
+// architectural promise: replacing the body via --from-stdin/--from-file
+// does not touch frontmatter (Comments, Tags, Links, Supersedes, etc.).
+// The repository's renderer regenerates the `## Comments` body section
+// from frontmatter on every save; the §A.1 fix and replace mode must not
+// regress this.
+func TestReplaceBody_PreservesExistingFrontmatterComments(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	existing := []Comment{{Author: "Jane", Date: "2026-01-01 12:00:00", Text: "real text"}}
+	d := &Decision{ID: "0001", Title: "Old", Status: "proposed", Comments: existing}
+
+	mockRepo.On("Save", "model", mock.MatchedBy(func(saved *Decision) bool {
+		return len(saved.Comments) == 1 && saved.Comments[0].Text == "real text"
+	}), minimalReplaceBody).Return(nil)
+
+	err := service.ReplaceBody("model", d, minimalReplaceBody, false)
+	assert.NoError(t, err)
+	assert.Len(t, d.Comments, 1)
+	assert.Equal(t, "real text", d.Comments[0].Text)
+}
+
+func TestReplaceBody_PreservesTitleWhenInputHasNoH1(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	bodyNoH1 := `## Context and Problem Statement
+
+context
+
+## Considered Options
+
+* A
+
+## Decision Outcome
+
+Chosen option: "A".
+`
+	d := &Decision{ID: "0001", Title: "Original", Status: "proposed"}
+	mockRepo.On("Save", "model", mock.MatchedBy(func(saved *Decision) bool {
+		return saved.Title == "Original"
+	}), bodyNoH1).Return(nil)
+
+	err := service.ReplaceBody("model", d, bodyNoH1, false)
+	assert.NoError(t, err)
+	assert.Equal(t, "Original", d.Title)
+}
+
 func TestCopy_DelegatesToRepo(t *testing.T) {
 	mockRepo := new(MockDecisionRepository)
 	service := NewDecisionService(mockRepo)

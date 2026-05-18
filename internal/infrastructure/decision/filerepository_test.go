@@ -252,6 +252,70 @@ func TestFileRepo_Copy_DuplicatesFileIntoTarget(t *testing.T) {
 	}
 }
 
+// TestFileRepo_Save_RenamesFileWhenTitleChanges verifies that Save renames
+// the on-disk file when d.Title (and thus the derived slug) changes — the
+// promise PR 3's `adg edit --from-stdin` depends on for title rewrites.
+func TestFileRepo_Save_RenamesFileWhenTitleChanges(t *testing.T) {
+	repo, modelDir := newRepoIn(t)
+
+	created, err := repo.Create(modelDir, "", &decision.Decision{Title: "Original title", Status: "proposed"})
+	if err != nil {
+		t.Fatalf("Create errored: %v", err)
+	}
+	originalPath := filepath.Join(modelDir, "0001-original-title.md")
+	if _, err := os.Stat(originalPath); err != nil {
+		t.Fatalf("expected original file: %v", err)
+	}
+
+	body, err := repo.LoadBody(modelDir, created.ID)
+	if err != nil {
+		t.Fatalf("LoadBody errored: %v", err)
+	}
+	created.Title = "Renamed title"
+	if err := repo.Save(modelDir, created, body); err != nil {
+		t.Fatalf("Save errored: %v", err)
+	}
+
+	newPath := filepath.Join(modelDir, "0001-renamed-title.md")
+	if _, err := os.Stat(newPath); err != nil {
+		t.Errorf("expected renamed file %s: %v", newPath, err)
+	}
+	if _, err := os.Stat(originalPath); !os.IsNotExist(err) {
+		t.Errorf("expected original file to be removed; stat err=%v", err)
+	}
+	if created.Slug != "renamed-title" {
+		t.Errorf("d.Slug = %q, want renamed-title", created.Slug)
+	}
+}
+
+// TestFileRepo_Save_NoRenameWhenTitleUnchanged is the no-op happy path.
+func TestFileRepo_Save_NoRenameWhenTitleUnchanged(t *testing.T) {
+	repo, modelDir := newRepoIn(t)
+
+	created, err := repo.Create(modelDir, "", &decision.Decision{Title: "Stable title", Status: "proposed"})
+	if err != nil {
+		t.Fatalf("Create errored: %v", err)
+	}
+	body, err := repo.LoadBody(modelDir, created.ID)
+	if err != nil {
+		t.Fatalf("LoadBody errored: %v", err)
+	}
+	if err := repo.Save(modelDir, created, body); err != nil {
+		t.Fatalf("Save errored: %v", err)
+	}
+
+	files, err := os.ReadDir(modelDir)
+	if err != nil {
+		t.Fatalf("ReadDir errored: %v", err)
+	}
+	if len(files) != 1 {
+		t.Errorf("expected exactly one file, got %d", len(files))
+	}
+	if files[0].Name() != "0001-stable-title.md" {
+		t.Errorf("filename = %q, want 0001-stable-title.md", files[0].Name())
+	}
+}
+
 func mustCreate(t *testing.T, repo *FileDecisionRepository, modelPath, title string) *decision.Decision {
 	t.Helper()
 	d, err := repo.Create(modelPath, "", &decision.Decision{Title: title, Status: "proposed"})

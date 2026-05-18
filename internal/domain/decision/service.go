@@ -22,7 +22,7 @@ import (
 //     state. UX changes (renamed flags, status gating, replace-mode editing)
 //     are deferred to PR 2 / PR 3.
 type DecisionService interface {
-	AddNew(modelPath, title string) (*Decision, error)
+	AddNew(modelPath, title, id string) (*Decision, error)
 	AddExisting(sourceModelPath, targetModelPath string, decision *Decision, body string, increment int) (*Decision, error)
 	GetAllDecisions(modelPath string) ([]Decision, error)
 	GetDecisionByID(modelPath, id string) (*Decision, error)
@@ -48,12 +48,16 @@ func NewDecisionService(repo DecisionRepository) DecisionService {
 	return &DecisionServiceImplementation{repo: repo}
 }
 
-func (s *DecisionServiceImplementation) AddNew(modelPath, title string) (*Decision, error) {
+// AddNew creates a new ADR. id is optional: empty means "let the repository
+// auto-assign next NNNN"; non-empty must be a 4-digit string, and the repository
+// will refuse if that ID is already taken (see ADR docs/fork-design/0008).
+func (s *DecisionServiceImplementation) AddNew(modelPath, title, id string) (*Decision, error) {
 	if !containsLetter(title) {
 		return nil, errors.New("title must contain at least one letter")
 	}
 	today := time.Now().Format("2006-01-02")
 	d := &Decision{
+		ID:     id,
 		Title:  title,
 		Status: "proposed",
 		Date:   today,

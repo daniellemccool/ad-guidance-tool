@@ -1,7 +1,10 @@
 package inputport
 
 type DecisionAdd interface {
-	Add(modelPath string, titles []string) error
+	// Add creates one or more ADRs. id is optional ("" means auto-assign):
+	// when non-empty, len(titles) must be 1 (an explicit ID is not meaningful
+	// across a batch).
+	Add(modelPath string, titles []string, id string) error
 }
 
 type DecisionComment interface {

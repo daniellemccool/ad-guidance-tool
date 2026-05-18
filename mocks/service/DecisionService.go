@@ -43,9 +43,9 @@ func (_m *DecisionService) AddExisting(sourceModelPath string, targetModelPath s
 	return r0, r1
 }
 
-// AddNew provides a mock function with given fields: modelPath, title
-func (_m *DecisionService) AddNew(modelPath string, title string) (*decision.Decision, error) {
-	ret := _m.Called(modelPath, title)
+// AddNew provides a mock function with given fields: modelPath, title, id
+func (_m *DecisionService) AddNew(modelPath string, title string, id string) (*decision.Decision, error) {
+	ret := _m.Called(modelPath, title, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for AddNew")
@@ -53,19 +53,19 @@ func (_m *DecisionService) AddNew(modelPath string, title string) (*decision.Dec
 
 	var r0 *decision.Decision
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string) (*decision.Decision, error)); ok {
-		return rf(modelPath, title)
+	if rf, ok := ret.Get(0).(func(string, string, string) (*decision.Decision, error)); ok {
+		return rf(modelPath, title, id)
 	}
-	if rf, ok := ret.Get(0).(func(string, string) *decision.Decision); ok {
-		r0 = rf(modelPath, title)
+	if rf, ok := ret.Get(0).(func(string, string, string) *decision.Decision); ok {
+		r0 = rf(modelPath, title, id)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*decision.Decision)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(modelPath, title)
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(modelPath, title, id)
 	} else {
 		r1 = ret.Error(1)
 	}

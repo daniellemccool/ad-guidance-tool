@@ -6,8 +6,11 @@ package decision
 // scan the directory directly — no index.yaml. Implementations must use the
 // madr package for parsing and rendering so the round-trip property is preserved.
 type DecisionRepository interface {
-	// Create writes a new ADR using the canonical MADR template. The Decision's
-	// ID is assigned by the repository (next NNNN); Slug is derived from Title.
+	// Create writes a new ADR using the canonical MADR template. If decision.ID
+	// is empty, the repository assigns the next NNNN. If decision.ID is pre-set
+	// (deterministic ID assignment, e.g. for plan-paper authoring), the
+	// repository validates the format and refuses to overwrite an existing ADR
+	// with the same ID. Slug is always derived from Title.
 	Create(modelPath, subFolderPath string, decision *Decision) (*Decision, error)
 
 	// Save writes back a Decision's frontmatter and body. The repository

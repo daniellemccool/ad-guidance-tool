@@ -137,6 +137,11 @@ func (s *DecisionServiceImplementation) Edit(modelPath string, d *Decision, cont
 //     repository regenerates the on-disk filename slug from Title on Save,
 //     so changing the title renames the file (atomically: write-new then
 //     remove-old).
+//   - If the body has no H1, the decision's existing Title is preserved and
+//     `# <Title>` is prepended to the body before save. This keeps the H1 as
+//     the on-disk title source-of-truth (per the type comment in
+//     madr/types.go) while letting authors submit bodies that start at
+//     `## Context...` without having to retype the title.
 //   - The body's `## Comments` section, if any, is discarded by the
 //     repository's renderer; comments live in frontmatter.
 func (s *DecisionServiceImplementation) ReplaceBody(modelPath string, d *Decision, newBody string, force bool) error {
@@ -160,6 +165,8 @@ func (s *DecisionServiceImplementation) ReplaceBody(modelPath string, d *Decisio
 
 	if parsed.Title != "" {
 		d.Title = parsed.Title
+	} else if d.Title != "" {
+		newBody = "# " + d.Title + "\n\n" + newBody
 	}
 	d.Date = time.Now().Format("2006-01-02")
 	return s.repo.Save(modelPath, d, newBody)

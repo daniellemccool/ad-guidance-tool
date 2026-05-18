@@ -329,7 +329,12 @@ func TestReplaceBody_PreservesExistingFrontmatterComments(t *testing.T) {
 	assert.Equal(t, "real text", d.Comments[0].Text)
 }
 
-func TestReplaceBody_PreservesTitleWhenInputHasNoH1(t *testing.T) {
+// When the input body has no H1, ReplaceBody preserves the decision's
+// existing Title and prepends `# <Title>` to the body so the on-disk file
+// always carries an H1. The body, parser, and validator all treat the H1
+// as the title source-of-truth; this lets authors submit bodies starting
+// at `## Context...` without retyping the title.
+func TestReplaceBody_InjectsH1FromTitleWhenInputHasNoH1(t *testing.T) {
 	mockRepo := new(MockDecisionRepository)
 	service := NewDecisionService(mockRepo)
 
@@ -345,14 +350,33 @@ context
 
 Chosen option: "A".
 `
+	expectedBody := "# Original\n\n" + bodyNoH1
 	d := &Decision{ID: "0001", Title: "Original", Status: "proposed"}
 	mockRepo.On("Save", "model", mock.MatchedBy(func(saved *Decision) bool {
 		return saved.Title == "Original"
-	}), bodyNoH1).Return(nil)
+	}), expectedBody).Return(nil)
 
 	err := service.ReplaceBody("model", d, bodyNoH1, false)
 	assert.NoError(t, err)
 	assert.Equal(t, "Original", d.Title)
+	mockRepo.AssertExpectations(t)
+}
+
+// When the input body has an H1, ReplaceBody uses it as the title source-of-truth
+// and saves the body verbatim — no double-prepend.
+func TestReplaceBody_UsesBodyH1WhenPresent(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	d := &Decision{ID: "0001", Title: "Old", Status: "proposed"}
+	mockRepo.On("Save", "model", mock.MatchedBy(func(saved *Decision) bool {
+		return saved.Title == "Replacement"
+	}), minimalReplaceBody).Return(nil)
+
+	err := service.ReplaceBody("model", d, minimalReplaceBody, false)
+	assert.NoError(t, err)
+	assert.Equal(t, "Replacement", d.Title)
+	mockRepo.AssertExpectations(t)
 }
 
 func TestSupersede_HappyPath(t *testing.T) {

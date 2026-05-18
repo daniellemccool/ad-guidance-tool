@@ -16,10 +16,6 @@ type ModelMerge interface {
 	Merge(modelAPath, modelBPath, targetPath string, filters map[string][]string) error
 }
 
-type ModelRebuildIndex interface {
-	RebuildIndex(modelPath string) error
-}
-
 type ModelValidate interface {
 	Validate(modelPath string) error
 }

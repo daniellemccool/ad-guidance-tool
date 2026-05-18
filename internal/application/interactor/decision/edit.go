@@ -19,7 +19,7 @@ func NewEditDecisionInteractor(service domain.DecisionService, output outputport
 	}
 }
 
-func (i *EditDecisionInteractor) Edit(modelPath, id, title string, question *string, options *[]string, criteria *string) error {
+func (i *EditDecisionInteractor) Edit(modelPath, id, title string, context *string, options *[]string, drivers *string) error {
 	var (
 		decision *domain.Decision
 		err      error
@@ -30,7 +30,7 @@ func (i *EditDecisionInteractor) Edit(modelPath, id, title string, question *str
 		return err
 	}
 
-	if err := i.service.Edit(modelPath, decision, question, options, criteria); err != nil {
+	if err := i.service.Edit(modelPath, decision, context, options, drivers); err != nil {
 		return err
 	}
 

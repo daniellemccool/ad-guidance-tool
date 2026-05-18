@@ -9,9 +9,9 @@ type DecisionEdit struct {
 	mock.Mock
 }
 
-// Edit provides a mock function with given fields: modelPath, id, title, question, options, criteria
-func (_m *DecisionEdit) Edit(modelPath string, id string, title string, question *string, options *[]string, criteria *string) error {
-	ret := _m.Called(modelPath, id, title, question, options, criteria)
+// Edit provides a mock function with given fields: modelPath, id, title, context, options, drivers
+func (_m *DecisionEdit) Edit(modelPath string, id string, title string, context *string, options *[]string, drivers *string) error {
+	ret := _m.Called(modelPath, id, title, context, options, drivers)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Edit")
@@ -19,7 +19,7 @@ func (_m *DecisionEdit) Edit(modelPath string, id string, title string, question
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, string, string, *string, *[]string, *string) error); ok {
-		r0 = rf(modelPath, id, title, question, options, criteria)
+		r0 = rf(modelPath, id, title, context, options, drivers)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -15,16 +15,16 @@ func TestEdit_ByID_Success(t *testing.T) {
 	mockOut := new(out_mocks.DecisionEdit)
 
 	d := &decision.Decision{ID: "0010"}
-	q := "What is the impact?"
+	ctx := "What is the impact?"
 	opts := []string{"Option 1", "Option 2"}
-	crit := "Speed, Cost"
+	drv := "Speed, Cost"
 
 	mockSvc.On("GetDecisionByID", "model", "0010").Return(d, nil)
-	mockSvc.On("Edit", "model", d, &q, &opts, &crit).Return(nil)
+	mockSvc.On("Edit", "model", d, &ctx, &opts, &drv).Return(nil)
 	mockOut.On("Edited", "0010").Return(nil)
 
 	interactor := NewEditDecisionInteractor(mockSvc, mockOut)
-	err := interactor.Edit("model", "0010", "", &q, &opts, &crit)
+	err := interactor.Edit("model", "0010", "", &ctx, &opts, &drv)
 
 	assert.NoError(t, err)
 	mockSvc.AssertExpectations(t)
@@ -36,15 +36,15 @@ func TestEdit_ByTitle_Success(t *testing.T) {
 	mockOut := new(out_mocks.DecisionEdit)
 
 	d := &decision.Decision{ID: "0020"}
-	q := "Change question?"
+	ctx := "Change context?"
 	opts := []string{"Yes", "No"}
 
 	mockSvc.On("GetDecisionByTitle", "model", "Decide Feature").Return(d, nil)
-	mockSvc.On("Edit", "model", d, &q, &opts, (*string)(nil)).Return(nil)
+	mockSvc.On("Edit", "model", d, &ctx, &opts, (*string)(nil)).Return(nil)
 	mockOut.On("Edited", "0020").Return(nil)
 
 	interactor := NewEditDecisionInteractor(mockSvc, mockOut)
-	err := interactor.Edit("model", "", "Decide Feature", &q, &opts, nil)
+	err := interactor.Edit("model", "", "Decide Feature", &ctx, &opts, nil)
 
 	assert.NoError(t, err)
 	mockSvc.AssertExpectations(t)
@@ -69,13 +69,13 @@ func TestEdit_EditFails(t *testing.T) {
 	mockOut := new(out_mocks.DecisionEdit)
 
 	d := &decision.Decision{ID: "0055"}
-	q := "Broken update"
+	ctx := "Broken update"
 
 	mockSvc.On("GetDecisionByID", "model", "0055").Return(d, nil)
-	mockSvc.On("Edit", "model", d, &q, (*[]string)(nil), (*string)(nil)).Return(errors.New("write error"))
+	mockSvc.On("Edit", "model", d, &ctx, (*[]string)(nil), (*string)(nil)).Return(errors.New("write error"))
 
 	interactor := NewEditDecisionInteractor(mockSvc, mockOut)
-	err := interactor.Edit("model", "0055", "", &q, nil, nil)
+	err := interactor.Edit("model", "0055", "", &ctx, nil, nil)
 
 	assert.ErrorContains(t, err, "write error")
 	mockSvc.AssertExpectations(t)

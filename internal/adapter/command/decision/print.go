@@ -68,7 +68,11 @@ func NewPrintCommand(input inputport.DecisionPrint, config domain.ConfigService)
 	}
 
 	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the decision model directory")
-	cmd.Flags().StringSliceVar(&idsOrTitles, "id", nil, "IDs or titles of the decisions to print (e.g. 0001, 'my-decision') (can be repeated)")
+	// StringArrayVar (not StringSliceVar) because this flag accepts titles as
+	// well as IDs (ResolveIdOrTitle routes non-NNNN values to titles), and
+	// titles can contain commas — StringSlice's CSV split would silently
+	// turn `--id "Store::open, migrate"` into two lookups.
+	cmd.Flags().StringArrayVar(&idsOrTitles, "id", nil, "IDs or titles of the decisions to print (e.g. 0001, 'my-decision'); repeat the flag for multiple")
 
 	cmd.Flags().BoolVar(&printContext, "context", false, "Print the Context and Problem Statement section")
 	cmd.Flags().BoolVar(&printDrivers, "drivers", false, "Print the Decision Drivers section")

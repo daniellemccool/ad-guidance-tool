@@ -55,6 +55,42 @@ func TestNewAddCommand_InputReturnsError(t *testing.T) {
 	assert.EqualError(t, err, "add failed")
 }
 
+// Regression: pflag's StringSliceVar splits values on commas, so
+// --title "Store::open, migrate" used to silently create two ADRs.
+// --title must be StringArrayVar to take the value verbatim.
+func TestNewAddCommand_TitleWithCommaIsSingleTitle(t *testing.T) {
+	mockInput := new(in_mocks.DecisionAdd)
+	mockConfig := new(svc_mocks.ConfigService)
+
+	mockConfig.On("IsLoaded").Return(true)
+	mockConfig.On("GetDefaultModelPath").Return("resolvedPath")
+	mockInput.On("Add", "resolvedPath", []string{"Store::open, migrate"}, "").Return(nil)
+
+	cmd := NewAddCommand(mockInput, mockConfig)
+	cmd.SetArgs([]string{"--title", "Store::open, migrate"})
+
+	err := cmd.Execute()
+	assert.NoError(t, err)
+	mockInput.AssertCalled(t, "Add", "resolvedPath", []string{"Store::open, migrate"}, "")
+}
+
+// Repeating --title still yields a slice with each value verbatim — no
+// per-value comma splitting.
+func TestNewAddCommand_RepeatedTitlesPreserveCommas(t *testing.T) {
+	mockInput := new(in_mocks.DecisionAdd)
+	mockConfig := new(svc_mocks.ConfigService)
+
+	mockConfig.On("IsLoaded").Return(true)
+	mockConfig.On("GetDefaultModelPath").Return("resolvedPath")
+	mockInput.On("Add", "resolvedPath", []string{"A, with comma", "B plain"}, "").Return(nil)
+
+	cmd := NewAddCommand(mockInput, mockConfig)
+	cmd.SetArgs([]string{"--title", "A, with comma", "--title", "B plain"})
+
+	err := cmd.Execute()
+	assert.NoError(t, err)
+}
+
 func TestNewAddCommand_IDFlag_PadsAndPasses(t *testing.T) {
 	mockInput := new(in_mocks.DecisionAdd)
 	mockConfig := new(svc_mocks.ConfigService)

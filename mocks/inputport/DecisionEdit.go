@@ -27,6 +27,24 @@ func (_m *DecisionEdit) Edit(modelPath string, id string, title string, context 
 	return r0
 }
 
+// ReplaceBody provides a mock function with given fields: modelPath, id, title, newBody, force
+func (_m *DecisionEdit) ReplaceBody(modelPath string, id string, title string, newBody string, force bool) error {
+	ret := _m.Called(modelPath, id, title, newBody, force)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReplaceBody")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, string, string, bool) error); ok {
+		r0 = rf(modelPath, id, title, newBody, force)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // NewDecisionEdit creates a new instance of DecisionEdit. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewDecisionEdit(t interface {

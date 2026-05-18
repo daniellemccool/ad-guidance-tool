@@ -76,7 +76,8 @@ After `adg comment`, the frontmatter grows a `comments:` list and a `## Comments
 |---|---|
 | `init <model>` | Create a new model directory. |
 | `add --title <title> [--model <dir>]` | Create a new ADR with the next ID. Refuses titles that slugify to empty. |
-| `edit --id <id> [--context ... \| --drivers ... \| --options ...]` | Append to a section. (Replace-mode editing is on the roadmap.) |
+| `edit --id <id> [--context ... \| --drivers ... \| --option ...]` | Append to a section. |
+| `edit --id <id> --from-stdin\|--from-file <path> [--force]` | Replace the decision body. Status-gated: non-proposed decisions require `--force`. |
 | `comment --id <id> --author <name> --text <text>` | Append a comment. Text is preserved verbatim. |
 | `decide --id <id> --option <name-or-number> [--rationale <text>]` | Set status to accepted and write the MADR "Chosen option: ..." line. |
 | `link --source <id> --target <id> --tag <name> [--reverse-tag <name>]` | Add a custom link. Use a future `supersede` command for supersession. |
@@ -91,6 +92,31 @@ After `adg comment`, the frontmatter grows a `comments:` list and a `## Comments
 | `set-config`, `reset-config` | Manage `.adgconfig.yaml`. |
 
 Run `adg <command> -h` for full flag details.
+
+## LLM-friendly editing
+
+For wholesale edits (e.g. an LLM rewrites a draft from scratch), use replace mode:
+
+```sh
+adg edit --id 0001 --from-stdin <<'EOF'
+# Renamed decision
+
+## Context and Problem Statement
+
+...
+EOF
+```
+
+Rules:
+
+- The body must parse as MADR and include the three required sections: `Context and Problem Statement`, `Considered Options`, `Decision Outcome`. Otherwise the command refuses and exits non-zero.
+- If the input has an `H1`, it overwrites the decision's title; the file is renamed on disk to match the new slug.
+- The `## Comments` section in the input is ignored — comments are frontmatter and are regenerated from there on every save.
+- A decision whose status is anything other than `proposed` requires `--force`. The intent: accepted/rejected/superseded ADRs are part of the historical record; replacing their body should be deliberate.
+
+`--from-file <path>` reads the same content from a file instead of stdin.
+
+The append flags (`--context`, `--drivers`, `--option`) still exist for incremental edits. Append and replace modes are mutually exclusive on a single invocation.
 
 ## Scripting (stdout / stderr / exit codes)
 

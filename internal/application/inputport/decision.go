@@ -14,6 +14,7 @@ type DecisionDecide interface {
 
 type DecisionEdit interface {
 	Edit(modelPath string, id string, title string, context *string, options *[]string, drivers *string) error
+	ReplaceBody(modelPath string, id string, title string, newBody string, force bool) error
 }
 
 type DecisionLink interface {

@@ -64,6 +64,42 @@ func TestEdit_GetDecisionFails(t *testing.T) {
 	mockSvc.AssertExpectations(t)
 }
 
+func TestReplaceBody_ByID_Success(t *testing.T) {
+	mockSvc := new(svc_mocks.DecisionService)
+	mockOut := new(out_mocks.DecisionEdit)
+
+	d := &decision.Decision{ID: "0010", Status: "proposed"}
+	body := "# T\n\n## Context and Problem Statement\n\nC\n"
+
+	mockSvc.On("GetDecisionByID", "model", "0010").Return(d, nil)
+	mockSvc.On("ReplaceBody", "model", d, body, false).Return(nil)
+	mockOut.On("Edited", "0010").Return(nil)
+
+	interactor := NewEditDecisionInteractor(mockSvc, mockOut)
+	err := interactor.ReplaceBody("model", "0010", "", body, false)
+
+	assert.NoError(t, err)
+	mockSvc.AssertExpectations(t)
+	mockOut.AssertExpectations(t)
+}
+
+func TestReplaceBody_PropagatesServiceError(t *testing.T) {
+	mockSvc := new(svc_mocks.DecisionService)
+	mockOut := new(out_mocks.DecisionEdit)
+
+	d := &decision.Decision{ID: "0020", Status: "accepted"}
+	body := "# T\n"
+
+	mockSvc.On("GetDecisionByID", "model", "0020").Return(d, nil)
+	mockSvc.On("ReplaceBody", "model", d, body, false).Return(errors.New("use --force"))
+
+	interactor := NewEditDecisionInteractor(mockSvc, mockOut)
+	err := interactor.ReplaceBody("model", "0020", "", body, false)
+
+	assert.ErrorContains(t, err, "use --force")
+	mockOut.AssertNotCalled(t, "Edited")
+}
+
 func TestEdit_EditFails(t *testing.T) {
 	mockSvc := new(svc_mocks.DecisionService)
 	mockOut := new(out_mocks.DecisionEdit)

@@ -311,6 +311,24 @@ func (_m *DecisionService) Link(modelPath string, source *madr.Decision, target 
 	return r0
 }
 
+// ReplaceBody provides a mock function with given fields: modelPath, _a1, newBody, force
+func (_m *DecisionService) ReplaceBody(modelPath string, _a1 *madr.Decision, newBody string, force bool) error {
+	ret := _m.Called(modelPath, _a1, newBody, force)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReplaceBody")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, *madr.Decision, string, bool) error); ok {
+		r0 = rf(modelPath, _a1, newBody, force)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Revise provides a mock function with given fields: modelPath, original
 func (_m *DecisionService) Revise(modelPath string, original *madr.Decision) (*madr.Decision, error) {
 	ret := _m.Called(modelPath, original)

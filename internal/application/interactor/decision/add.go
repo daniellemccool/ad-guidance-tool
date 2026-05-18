@@ -26,7 +26,7 @@ func NewAddDecisionsInteractor(
 	}
 }
 
-func (i *AddDecisionsInteractor) Add(modelPath string, titles []string) error {
+func (i *AddDecisionsInteractor) Add(modelPath string, titles []string, id string) error {
 	var successes []*decisiondomain.Decision
 	failures := make(map[string]error)
 
@@ -34,9 +34,24 @@ func (i *AddDecisionsInteractor) Add(modelPath string, titles []string) error {
 		return fmt.Errorf("can not add decisions, model directory %q does not exist (run `adg init %s` to create it)", modelPath, modelPath)
 	}
 
-	for _, title := range titles {
-		decision, err := i.decisionService.AddNew(modelPath, title)
+	if id != "" && len(titles) != 1 {
+		return fmt.Errorf("--id can only be used with a single --title (got %d titles)", len(titles))
+	}
+
+	for idx, title := range titles {
+		assignID := ""
+		if idx == 0 {
+			assignID = id
+		}
+		decision, err := i.decisionService.AddNew(modelPath, title, assignID)
 		if err != nil {
+			// With explicit --id, the caller has made a deterministic claim
+			// about which ID they want; surface the failure as a command
+			// error (non-zero exit) without going through the batch-style
+			// failure printer, which would just re-print the same message.
+			if id != "" {
+				return err
+			}
 			failures[title] = err
 			continue
 		}

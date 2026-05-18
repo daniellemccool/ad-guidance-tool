@@ -51,7 +51,7 @@ func TestAddNew_InvalidTitle(t *testing.T) {
 	mockRepo := new(MockDecisionRepository)
 	service := NewDecisionService(mockRepo)
 
-	result, err := service.AddNew("model", "12345 !!!")
+	result, err := service.AddNew("model", "12345 !!!", "")
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -65,13 +65,29 @@ func TestAddNew_DelegatesToRepo(t *testing.T) {
 
 	created := &Decision{ID: "0001", Title: "Create something", Status: "proposed"}
 	mockRepo.On("Create", "model", "", mock.MatchedBy(func(d *Decision) bool {
-		return d.Title == "Create something" && d.Status == "proposed" && d.Date != ""
+		return d.Title == "Create something" && d.Status == "proposed" && d.Date != "" && d.ID == ""
 	})).Return(created, nil)
 
-	result, err := service.AddNew("model", "Create something")
+	result, err := service.AddNew("model", "Create something", "")
 
 	assert.NoError(t, err)
 	assert.Equal(t, created, result)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestAddNew_PassesExplicitIDToRepo(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	created := &Decision{ID: "0022", Title: "With ID", Status: "proposed"}
+	mockRepo.On("Create", "model", "", mock.MatchedBy(func(d *Decision) bool {
+		return d.ID == "0022" && d.Title == "With ID"
+	})).Return(created, nil)
+
+	result, err := service.AddNew("model", "With ID", "0022")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "0022", result.ID)
 	mockRepo.AssertExpectations(t)
 }
 

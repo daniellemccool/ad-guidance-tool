@@ -1,0 +1,50 @@
+# Configuration for `mockery` (v2). Run `mockery` from the repo root after
+# changing any interface to regenerate the files under mocks/. The DecisionRepository
+# interface is intentionally not mocked here — its mock lives next to its tests
+# at internal/domain/decision/mock_repository.go.
+
+filename: "{{.InterfaceName}}.go"
+mockname: "{{.InterfaceName}}"
+outpkg: "mocks"
+# Keep the legacy On(...)-based mock style. Tests use mock.Mock's On(...) calls
+# directly; switching to with-expecter: true would require rewriting every test
+# to use the .EXPECT() helper. The future v3 default is true; that migration is
+# out of scope for this commit.
+with-expecter: false
+# These three match the future v3 defaults and silence the deprecation warnings.
+# resolve-type-alias: false makes the mocks reference type aliases as written
+# (e.g. decision.Decision) instead of resolving through to the underlying type
+# (madr.Decision). disable-version-string drops the brittle mockery-version
+# header line from every generated file.
+resolve-type-alias: false
+disable-version-string: true
+issue-845-fix: true
+
+packages:
+  adg/internal/application/inputport:
+    config:
+      all: True
+      dir: "mocks/inputport"
+
+  adg/internal/application/outputport:
+    config:
+      all: True
+      dir: "mocks/outputport"
+
+  adg/internal/domain/decision:
+    config:
+      dir: "mocks/service"
+    interfaces:
+      DecisionService:
+
+  adg/internal/domain/config:
+    config:
+      dir: "mocks/service"
+    interfaces:
+      ConfigService:
+
+  adg/internal/domain/model:
+    config:
+      dir: "mocks/service"
+    interfaces:
+      ModelService:

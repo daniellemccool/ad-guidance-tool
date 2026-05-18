@@ -8,9 +8,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
+
+var idRe = regexp.MustCompile(`^\d{4}$`)
 
 // FileDecisionRepository persists Decisions as MADR 4.0–format files on disk.
 // Files are named NNNN-slug.md; the model directory is scanned on every read
@@ -22,12 +25,29 @@ func NewFileDecisionRepository() *FileDecisionRepository {
 	return &FileDecisionRepository{}
 }
 
+// Create writes a new ADR file. If d.ID is empty, the repository assigns the
+// next NNNN (max existing + 1). If d.ID is set, the repository validates the
+// format and refuses to overwrite an existing ADR with the same ID — plan-paper
+// authoring needs deterministic ID assignment (see ADR docs/fork-design/0008),
+// and silently shifting to the next free slot would defeat the point.
 func (r *FileDecisionRepository) Create(modelPath, subFolderPath string, d *domain.Decision) (*domain.Decision, error) {
-	id, err := r.generateNextID(modelPath)
-	if err != nil {
-		return nil, err
+	if d.ID == "" {
+		id, err := r.generateNextID(modelPath)
+		if err != nil {
+			return nil, err
+		}
+		d.ID = id
+	} else {
+		if !idRe.MatchString(d.ID) {
+			return nil, fmt.Errorf("invalid ID %q: must be 4 digits (0001-9999)", d.ID)
+		}
+		if d.ID == "0000" {
+			return nil, fmt.Errorf("invalid ID %q: 0000 is reserved", d.ID)
+		}
+		if existing, err := r.FindDecisionFile(modelPath, d.ID); err == nil {
+			return nil, fmt.Errorf("ADR %s already exists at %s", d.ID, existing)
+		}
 	}
-	d.ID = id
 	slug, err := slugify(d.Title)
 	if err != nil {
 		return nil, err

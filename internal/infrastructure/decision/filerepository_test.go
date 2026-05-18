@@ -68,6 +68,93 @@ func TestFileRepo_Create_IDSequenceSkipsToHighestPlusOne(t *testing.T) {
 	}
 }
 
+func TestFileRepo_Create_UsesExplicitID(t *testing.T) {
+	repo, modelDir := newRepoIn(t)
+
+	created, err := repo.Create(modelDir, "", &decision.Decision{ID: "0042", Title: "Plan-paper authored", Status: "proposed"})
+	if err != nil {
+		t.Fatalf("Create errored: %v", err)
+	}
+	if created.ID != "0042" {
+		t.Errorf("ID = %q, want 0042 (preserved from input)", created.ID)
+	}
+	expectedFile := filepath.Join(modelDir, "0042-plan-paper-authored.md")
+	if _, err := os.Stat(expectedFile); err != nil {
+		t.Errorf("expected file %s to exist: %v", expectedFile, err)
+	}
+}
+
+func TestFileRepo_Create_ExplicitIDDoesNotAffectAutoSequence(t *testing.T) {
+	repo, modelDir := newRepoIn(t)
+
+	// Pre-place 0042 explicitly. The next auto-assignment should still be
+	// "highest + 1" = 0043, not 0001.
+	if _, err := repo.Create(modelDir, "", &decision.Decision{ID: "0042", Title: "Explicit", Status: "proposed"}); err != nil {
+		t.Fatalf("Create with explicit ID errored: %v", err)
+	}
+	auto, err := repo.Create(modelDir, "", &decision.Decision{Title: "Auto", Status: "proposed"})
+	if err != nil {
+		t.Fatalf("Create auto errored: %v", err)
+	}
+	if auto.ID != "0043" {
+		t.Errorf("auto-assigned ID = %q, want 0043 (highest existing + 1)", auto.ID)
+	}
+}
+
+func TestFileRepo_Create_RejectsExplicitIDCollision(t *testing.T) {
+	repo, modelDir := newRepoIn(t)
+
+	if _, err := repo.Create(modelDir, "", &decision.Decision{ID: "0022", Title: "First", Status: "proposed"}); err != nil {
+		t.Fatalf("Create first errored: %v", err)
+	}
+
+	_, err := repo.Create(modelDir, "", &decision.Decision{ID: "0022", Title: "Duplicate", Status: "proposed"})
+	if err == nil {
+		t.Fatal("expected Create to refuse colliding ID")
+	}
+	if !strings.Contains(err.Error(), "0022 already exists") {
+		t.Errorf("error did not mention the colliding ID: %v", err)
+	}
+
+	// Original file must be untouched.
+	originalFile := filepath.Join(modelDir, "0022-first.md")
+	contents, err := os.ReadFile(originalFile)
+	if err != nil {
+		t.Fatalf("could not read original file: %v", err)
+	}
+	if !strings.Contains(string(contents), "# First") {
+		t.Errorf("original file was overwritten; H1 = %q", string(contents))
+	}
+}
+
+func TestFileRepo_Create_RejectsInvalidExplicitIDFormat(t *testing.T) {
+	repo, modelDir := newRepoIn(t)
+
+	cases := []string{"1", "22", "00022", "abcd", "12a3"}
+	for _, badID := range cases {
+		_, err := repo.Create(modelDir, "", &decision.Decision{ID: badID, Title: "T", Status: "proposed"})
+		if err == nil {
+			t.Errorf("Create(%q) should have errored on invalid ID format", badID)
+			continue
+		}
+		if !strings.Contains(err.Error(), "invalid ID") {
+			t.Errorf("Create(%q) error did not mention invalid ID: %v", badID, err)
+		}
+	}
+}
+
+func TestFileRepo_Create_RejectsReservedZeroID(t *testing.T) {
+	repo, modelDir := newRepoIn(t)
+
+	_, err := repo.Create(modelDir, "", &decision.Decision{ID: "0000", Title: "T", Status: "proposed"})
+	if err == nil {
+		t.Fatal("expected Create to reject reserved ID 0000")
+	}
+	if !strings.Contains(err.Error(), "reserved") {
+		t.Errorf("error did not mention 0000 is reserved: %v", err)
+	}
+}
+
 func TestFileRepo_CreateLoadById_RoundTrip(t *testing.T) {
 	repo, modelDir := newRepoIn(t)
 

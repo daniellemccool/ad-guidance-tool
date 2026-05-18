@@ -11,7 +11,7 @@ import (
 
 func NewEditCommand(input inputport.DecisionEdit, config domain.ConfigService) *cobra.Command {
 	var modelPath, idOrTitle, id, title string
-	var question, criteria string
+	var context, drivers string
 	var options []string
 	var err error
 
@@ -30,33 +30,33 @@ func NewEditCommand(input inputport.DecisionEdit, config domain.ConfigService) *
 			}
 
 			// validate: must be editing something
-			if question == "" && criteria == "" && len(options) == 0 {
-				return fmt.Errorf("at least one of --question, --option, or --criteria must be provided")
+			if context == "" && drivers == "" && len(options) == 0 {
+				return fmt.Errorf("at least one of --context, --option, or --drivers must be provided")
 			}
 
 			// prepare pointer args
-			var qPtr, cPtr *string
+			var ctxPtr, drvPtr *string
 			var oPtr *[]string
 
-			if question != "" {
-				qPtr = &question
+			if context != "" {
+				ctxPtr = &context
 			}
-			if criteria != "" {
-				cPtr = &criteria
+			if drivers != "" {
+				drvPtr = &drivers
 			}
 			if len(options) > 0 {
 				oPtr = &options
 			}
 
-			return input.Edit(modelPath, id, title, qPtr, oPtr, cPtr)
+			return input.Edit(modelPath, id, title, ctxPtr, oPtr, drvPtr)
 		},
 	}
 
 	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the decision model (optional if set in config)")
 	cmd.Flags().StringVar(&idOrTitle, "id", "", "ID or title of the decision to edit (e.g. 0001, 'my-decision')")
-	cmd.Flags().StringVar(&question, "question", "", "Edit the Question section")
-	cmd.Flags().StringArrayVar(&options, "option", nil, "Add one or more options (use multiple --option flags to specify multiple options at once or repeat command)")
-	cmd.Flags().StringVar(&criteria, "criteria", "", "Edit the Criterion section")
+	cmd.Flags().StringVar(&context, "context", "", "Append to the Context and Problem Statement section")
+	cmd.Flags().StringArrayVar(&options, "option", nil, "Add one or more considered options (repeat to add multiple)")
+	cmd.Flags().StringVar(&drivers, "drivers", "", "Append to the Decision Drivers section")
 
 	return cmd
 }

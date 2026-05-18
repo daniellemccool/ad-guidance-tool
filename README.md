@@ -1,233 +1,143 @@
-# ADG
-ADG (Architectural Decision Guidance) is a command-line tool written in Go for modeling, managing, and reusing architectural decisions in a lightweight and structured way.
+# ADG (MADR-native fork)
 
-An architectural decision is a justified design choice addressing a functional or non-functional requirement that is architecturally significant. These decisions can be captured using Architectural Decision Records (ADRs). ADG allows you to create and edit ADRs, group them into *models*, and manage those models. A model can be created, copied, imported, or merged, providing guidance for recurring decisions.
+A command-line tool for managing **Architectural Decision Records (ADRs)** in [MADR 4.0](https://adr.github.io/madr/) format. ADRs are grouped into *models* (a directory of files), and the tool helps you create, edit, link, validate, and search them.
 
-## Getting started
+This is a fork of [adr/ad-guidance-tool](https://github.com/adr/ad-guidance-tool) — see [Fork rationale](#fork-rationale) for what differs.
 
-To start using ADG, you can either download the [latest release](https://github.com/adr/ad-guidance-tool/releases) or build it from source.
+## Fork rationale
 
-### Downloading a release
+The upstream tool used a custom Markdown layout with HTML anchor tags and a sidecar `index.yaml`. This fork:
 
-Precompiled executables for major operating systems are available:
-- Windows: `adg_win.exe`
-- Linux: `adg_linux`
-- macOS (Intel): `adg_mac_intel`
-- macOS (Apple Silicon): `adg_mac_arm`
+- **Adopts MADR 4.0 as the on-disk format.** Files look like ordinary MADR ADRs and round-trip through `parse → render`.
+- **Stores metadata in YAML frontmatter.** Tags, custom links, comments, supersession, and a `legacy-outcome` flag are first-class fields. The body is a projection of frontmatter for sections the tool regenerates (e.g. `## Comments`).
+- **Drops `index.yaml`.** ADR files are the only source of truth; `adg rebuild` is gone.
+- **Fixes the comment data-loss bug.** Upstream wrote a placeholder count where the comment text should be. Here, comment text is preserved verbatim in frontmatter and re-rendered into the body on every save.
+- **Rewrites `adg validate`** in MADR terms. New checks include MADR-section presence, status vocabulary, and bidirectional supersession integrity.
+- **Renames `adg view` section flags** to MADR vocabulary: `--context`, `--drivers`, `--options`, `--outcome`, `--comments`.
 
-> For convenience, feel free to remove the suffix (e.g., `_win`) after you have downloaded the file.
+Stdout/stderr split (machine values on stdout, status on stderr), `adg edit --from-stdin`, `adg supersede` as first-class, and `adg migrate` for legacy ADG → MADR conversion are tracked in follow-up PRs.
 
-### Building from source
+## Install
 
-To build ADG yourself, ensure that [Go](https://go.dev/dl/) is installed on your system. Then run:
+Build from source:
 
-```bash
-git clone https://github.com/adr/ad-guidance-tool.git
+```sh
+git clone https://github.com/daniellemccool/ad-guidance-tool.git
 cd ad-guidance-tool
-go build
-```
-This will generate a binary in your current directory called `adg` (or `adg.exe` on Windows).
-
-### Running the tool
-
-Executing the binary displays the CLI help:
-
-```
-CLI tool for managing architectural decision records and models
-
-Usage:
-  adg [command]
-
-Available Commands:
-  add          Adds one or more decision points to a model
-  comment      Add a comment to a decision
-  copy         Copies a model, optionally a subset based on filters
-  decide       Marks a decision as decided by selecting one of its options
-  edit         Edit a decision file
-  help         Help about any command
-  import       Imports a decision model into an existing model
-  init         Initializes a new model
-  link         Link two decisions using optional custom tags or default precedes/succeeds logic
-  list         Lists decisions in the model, optionally filtering by tag, status, title, or ID
-  merge        Merges two decision models into a new target model
-  rebuild      Rebuilds the index file for the given model
-  reset-config Reset all configuration (or only template headers with --template)
-  revise       Creates a copy of a decision and resets its status to 'open' (if not already)
-  set-config   Set persistent configuration values
-  tag          Categorizes a decision by adding one or more tags to its metadata
-  validate     Validate the models decisions by checking if the files match the index file
-  view         Show the full or partial content of one or more decision files
-
-Flags:
-  -h, --help   help for adg
-
-Use "adg [command] --help" for more information about a command.
+go build           # produces ./adg
+# or:
+go install ./...   # installs to $GOBIN
 ```
 
-### Shell auto-completion
+Go 1.22+ is required.
 
-To enhance your workflow, ADG supports shell auto-completion. Generate a script with:
+## File format
 
-```bash
-adg completion [shell]
-```
-
-For example, to enable auto-completion in PowerShell:
-
-```bash
-adg completion powershell
-```
-
-Copy the output into your [PowerShell profile](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_profiles?view=powershell-7.5) to enable completions. Follow a similar process for other shells (available: `bash`, `fish`, `powershell`, `zsh`).
-
-## User Guide
-
-### Creating a new model
-
-To create a new decision model, use the `init` command:
-
-```bash
-adg init <model-name>
-```
-
-This creates a new directory (in your current working directory, unless an absolute or relative path is provided) containing an `index` file. This index tracks metadata for all decisions in the model and is continuously updated as decisions change.
-
-### Adding and editing a decision
-
-To add a new decision to the model:
-
-```bash
-adg add --model <model-name> --title <decision-title>
-```
-
-This generates a new Markdown file inside the model directory. Each new file includes a metadata block followed by three sections: *Question*, *Options*, *Criteria*.
-
-You can edit these sections manually in a text editor, or using the `edit` command of the tool:
-
-```bash
-adg edit --model <model-name> --id <decision-id | decision-title> [--question "<section-content>"] [--option "<option-name>"] [--criteria "<section-content>"]
-```
-
-> The `--option` flag is repeatable for adding multiple options. Each option is automatically given an anchor tag so it can be referenced.
-
-If you're editing manually, ensure the structure matches the following format:
-```markdown
----
-adr_id: "0001"
-title: your-title
-status: open
-tags: []
-links: []
-comments: []
----
-
-## <a name="question"></a> Question
-
-<!-- section content -->
-
-## <a name="options"></a> Options
-
-1. <a name="option-1"></a> Option 1
-2. <a name="option-2"></a> Option 2
-3. <a name="option-3"></a> Option 3
-<!-- and so on -->
-
-## <a name="criteria"></a> Criteria
-
-<!-- section content -->
-```
-
-You may change the displayed section header and/or include additional sections, but the tool expects at least the three sections and their anchor tags mentioned above to function properly.
-
-For example:
+Each ADR is `NNNN-slug.md` inside a model directory. Example:
 
 ```markdown
 ---
-adr_id: "0001"
-title: your-title
-status: open
-tags: []
-links: []
-comments: []
+status: proposed
+date: "2026-05-18"
+tags: [data, infra]
 ---
 
-## <a name="question"></a> Context and Problem Statement
-<!-- section content -->
+# Decision title
 
-## <a name="options"></a> Considered Options
-1. <a name="option-1"></a> This is my first considered option
-2. <a name="option-2"></a> This is my second considered option
-<!-- and so on -->
+## Context and Problem Statement
 
-## <a name="criteria"></a> Decision Drivers
-<!-- section content -->
+What problem are we solving?
 
-## Pros and Cons of the Options
-<!-- section content -->
+## Decision Drivers
 
+* {driver 1}
+* {driver 2}
+
+## Considered Options
+
+* Option A
+* Option B
+
+## Decision Outcome
+
+Chosen option: "Option A", because reasons.
+
+### Consequences
+
+* Good, because ...
+* Bad, because ...
 ```
 
-### Deciding on an option
+After `adg comment`, the frontmatter grows a `comments:` list and a `## Comments` body section is regenerated from it. The `links:` map holds custom link tags; `supersedes:` lists predecessor IDs.
 
-To mark a decision as decided:
+## Command reference
 
-```bash
-adg decide --model <model-name> --id <decision-id | decision-title> --option <option-number | option-title> [--rationale "your-rationale"] 
+| Command | Purpose |
+|---|---|
+| `init <model>` | Create a new model directory. |
+| `add --title <title> [--model <dir>]` | Create a new ADR with the next ID. Refuses titles that slugify to empty. |
+| `edit --id <id> [--context ... \| --drivers ... \| --options ...]` | Append to a section. (Replace-mode editing is on the roadmap.) |
+| `comment --id <id> --author <name> --text <text>` | Append a comment. Text is preserved verbatim. |
+| `decide --id <id> --option <name-or-number> [--rationale <text>]` | Set status to accepted and write the MADR "Chosen option: ..." line. |
+| `link --source <id> --target <id> --tag <name> [--reverse-tag <name>]` | Add a custom link. Use a future `supersede` command for supersession. |
+| `tag --id <id> --tag <name>` | Add a tag. |
+| `revise --id <id>` | Clone the decision into a new draft. |
+| `view --id <id> [--context\|--drivers\|--options\|--outcome\|--comments]` | Print full body or selected sections. |
+| `list [--filter ...]` | List decisions; `--format json\|yaml\|md\|simple`. |
+| `validate [--model <dir>]` | Check MADR shape, supersession integrity, comment text. |
+| `copy --model <src> --target <dst>` | Clone a model directory (filterable). |
+| `import --source <dir> --target <dir>` | Import filtered decisions into an existing model. |
+| `merge --model-a <a> --model-b <b> --target <dst>` | Combine two models into a fresh one. |
+| `set-config`, `reset-config` | Manage `.adgconfig.yaml`. |
+
+Run `adg <command> -h` for full flag details.
+
+## Validation rules
+
+`adg validate` reports per-decision issues across:
+
+1. Filename matches `NNNN-slug.md`.
+2. H1 title present.
+3. Required MADR sections present: `Context and Problem Statement`, `Considered Options`, `Decision Outcome`.
+4. `Considered Options` has at least one bullet.
+5. When status is `accepted` (and `legacy-outcome: false`), the Decision Outcome contains `Chosen option: "X"` with X appearing in Considered Options.
+6. Status matches MADR vocabulary: `proposed`, `rejected`, `accepted`, `deprecated`, or `superseded by ADR-NNNN`.
+7. Supersession forward integrity: `superseded by ADR-X` implies ADR-X exists and lists self in its `supersedes:`.
+8. Supersession reverse integrity: every `supersedes:` entry points to an ADR whose status references self.
+9. Comment text is non-empty and not purely numeric (defends against the legacy placeholder regression).
+
+## Config
+
+```sh
+adg set-config         # configure defaults (model path, author, etc.)
+adg reset-config       # clear all values
 ```
 
-This will add a new section **Outcome** pointing out the chosen option and a rationale if provided to the command.
+Config lives at `~/.adgconfig.yaml` by default; override with `--config-path`.
 
-### Config
+## Migrating from upstream ADG
 
-You can customize ADG's behavior using:
-
-```bash
-adg set-config [flags]
-```
-> Run with `-h` to see available configuration flags.
-
-By default configuration is stored in a file called `.adgconfig.yaml` located in your home directory. You can specify a custom path using the `--config-path` flag.
-
-To reset all configuration values (and use the default configuration path again):
-
-```bash
-adg reset-config
-```
-
-### Example Model
-
-In the [models/clean](/models/clean/) directory, you’ll find a sample model containing common architectural decisions based on **Clean Architecture**.
-
-You can use this model as a starting point to get familiar with the tool by copying it:
-
-```bash
-adg copy --model models/clean --target <new-model-name>
-```
-
-For more commands see the help text output:
-```bash
-adg -h            # for a general overview
-adg <command> -h  # for a specific command
-```
+Files using the legacy ADG format are refused at read time with an error pointing to `adg migrate`. The migrate command lands in a follow-up PR — until then, ADRs need conversion by hand or by keeping a separate model.
 
 ## Contributing
 
-If you have a feature request or found a bug, you can [open an issue](https://github.com/adr/ad-guidance-tool/issues) to share your feedback.
+The codebase follows Clean Architecture (domain → application → adapter → infrastructure). Tests use [testify](https://github.com/stretchr/testify) and [mockery](https://github.com/vektra/mockery). For changes:
 
-Contributions are also welcome. Please submit a [pull request](https://github.com/adr/ad-guidance-tool/pulls) with your changes.
+1. Start with the use case (interactor) or domain logic.
+2. Add cobra command + presenter at the adapter layer.
+3. Cover with unit tests; regenerate mocks if interfaces shift.
+4. Run `go test ./...` before pushing.
 
-We follow [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html) to organize our codebase. If you're adding a feature, we recommend to:
-1. Start with the use case (interactor) of your feature
-2. Add any necessary core logic in the domain layer
-3. Implement the [Cobra CLI command](https://github.com/spf13/cobra) for input and a *presenter/printer* for output
-4. Write unit tests (refer to existing tests for guidance). To simplify mocking, we use [mockery](https://github.com/vektra/mockery), though hand-written mocks are also possible.
+Open an issue or PR against this fork.
 
 ## References
 
-ADG was developed as part of two theses at the [Eastern Switzerland University of Applied Sciences](https://www.ost.ch/en/)
-- [Concept Alternatives for the Management of Architectural Decisions in Clean Architectures](https://eprints.ost.ch/id/eprint/1280/1/MSECS-FS24-CleanArchitectureDecisionsConceptsRS.pdf)
-- [A Command-Line Tool for Managing Recurring Architectural Decisions: Design, Implementation, and Empirical Evaluation](https://eprints.ost.ch/id/eprint/1287/1/PA2-Raphael-Schellander.pdf)
+- [MADR](https://adr.github.io/madr/) — the file format this fork adopts.
+- Upstream tool: [adr/ad-guidance-tool](https://github.com/adr/ad-guidance-tool).
+- Original theses behind the upstream tool:
+  - [Concept Alternatives for the Management of Architectural Decisions in Clean Architectures](https://eprints.ost.ch/id/eprint/1280/1/MSECS-FS24-CleanArchitectureDecisionsConceptsRS.pdf)
+  - [A Command-Line Tool for Managing Recurring Architectural Decisions](https://eprints.ost.ch/id/eprint/1287/1/PA2-Raphael-Schellander.pdf)
 
 ## License
 
-ADG is released under the [Apache License, Version 2.0.](https://www.apache.org/licenses/LICENSE-2.0)
+Apache License 2.0 — see [LICENSE](./LICENSE).

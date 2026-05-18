@@ -13,7 +13,7 @@ type DecisionDecide interface {
 }
 
 type DecisionEdit interface {
-	Edit(modelPath string, id string, title string, question *string, options *[]string, criteria *string) error
+	Edit(modelPath string, id string, title string, context *string, options *[]string, drivers *string) error
 }
 
 type DecisionLink interface {

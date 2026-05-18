@@ -21,7 +21,7 @@ func TestNewEditCommand_Success(t *testing.T) {
 	cmd := NewEditCommand(mockInput, mockConfig)
 	cmd.SetArgs([]string{
 		"--id", "0001",
-		"--question", "updated question",
+		"--context", "updated context paragraph",
 	})
 
 	err := cmd.Execute()
@@ -41,7 +41,7 @@ func TestNewEditCommand_MissingFields(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	assert.EqualError(t, err, "at least one of --question, --option, or --criteria must be provided")
+	assert.EqualError(t, err, "at least one of --context, --option, or --drivers must be provided")
 }
 
 func TestNewEditCommand_EditFails(t *testing.T) {
@@ -56,7 +56,7 @@ func TestNewEditCommand_EditFails(t *testing.T) {
 	cmd := NewEditCommand(mockInput, mockConfig)
 	cmd.SetArgs([]string{
 		"--id", "0001",
-		"--question", "Q?",
+		"--context", "some context",
 	})
 
 	err := cmd.Execute()

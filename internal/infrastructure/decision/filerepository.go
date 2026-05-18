@@ -28,7 +28,11 @@ func (r *FileDecisionRepository) Create(modelPath, subFolderPath string, d *doma
 		return nil, err
 	}
 	d.ID = id
-	d.Slug = slugify(d.Title)
+	slug, err := slugify(d.Title)
+	if err != nil {
+		return nil, err
+	}
+	d.Slug = slug
 
 	body := madr.RenderNewBody(d.Title)
 	out, err := madr.RenderFile(*d, body)
@@ -72,7 +76,10 @@ func (r *FileDecisionRepository) LoadByTitle(modelPath, title string) (*domain.D
 	if err != nil {
 		return nil, err
 	}
-	slug := slugify(title)
+	slug, err := slugify(title)
+	if err != nil {
+		return nil, err
+	}
 	var exact *domain.Decision
 	var partial []*domain.Decision
 	for i := range all {
@@ -247,14 +254,31 @@ func (r *FileDecisionRepository) generateNextID(modelPath string) (string, error
 	return fmt.Sprintf("%04d", maxID+1), nil
 }
 
-func slugify(title string) string {
-	s := strings.ToLower(title)
-	s = strings.ReplaceAll(s, " ", "-")
+// slugify converts a title into a filename-safe slug. Any rune outside
+// [a-z0-9-] is replaced with '-' (not stripped) so word boundaries from
+// punctuation, underscores, and type parameters survive — e.g.
+// `VecDeque<u8>` becomes `vecdeque-u8` rather than `vecdequeu8`. Consecutive
+// '-' collapse to one and leading/trailing '-' are trimmed. An empty result
+// returns an error so the AddNew flow surfaces a clear failure instead of
+// writing `NNNN-.md`.
+func slugify(title string) (string, error) {
 	var b strings.Builder
-	for _, r := range s {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+	prevDash := true // treat start-of-string as already-dashed so we trim leading '-'
+	for _, r := range strings.ToLower(title) {
+		switch {
+		case (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'):
 			b.WriteRune(r)
+			prevDash = false
+		default:
+			if !prevDash {
+				b.WriteByte('-')
+				prevDash = true
+			}
 		}
 	}
-	return b.String()
+	slug := strings.TrimRight(b.String(), "-")
+	if slug == "" {
+		return "", fmt.Errorf("title %q slugifies to empty; please include at least one letter or digit", title)
+	}
+	return slug, nil
 }

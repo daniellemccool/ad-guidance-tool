@@ -36,3 +36,7 @@ type DecisionRevise interface {
 type DecisionTag interface {
 	Tag(modelPath, id, title string, tags []string) error
 }
+
+type DecisionSupersede interface {
+	Supersede(modelPath, newID, newTitle, oldID, oldTitle, rationale string) error
+}

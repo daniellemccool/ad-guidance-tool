@@ -252,6 +252,122 @@ func TestFileRepo_Copy_DuplicatesFileIntoTarget(t *testing.T) {
 	}
 }
 
+// TestFileRepo_MigrateLegacyFiles_RenamesAndRewrites locks in PR 4's
+// on-disk migration behavior: a legacy `AD0001-foo.md` file is rewritten
+// as `0001-foo.md` with MADR-shaped body and frontmatter, and the
+// original is removed. Idempotence is also asserted: a second run on the
+// already-migrated dir finds nothing to do.
+func TestFileRepo_MigrateLegacyFiles_RenamesAndRewrites(t *testing.T) {
+	repo, modelDir := newRepoIn(t)
+
+	legacy := `---
+adr_id: "0001"
+title: try-migration
+status: open
+tags:
+    - architecture
+links:
+    precedes: []
+    succeeds: []
+comments: []
+---
+
+## <a name="question"></a> Question
+
+What should we do?
+
+## <a name="options"></a> Options
+
+1. <a name="option-1"></a> Adopt MADR
+2. <a name="option-2"></a> Keep legacy
+
+## <a name="criteria"></a> Criteria
+
+- Cleanliness
+`
+	legacyPath := filepath.Join(modelDir, "AD0001-try-migration.md")
+	if err := os.WriteFile(legacyPath, []byte(legacy), 0o644); err != nil {
+		t.Fatalf("WriteFile errored: %v", err)
+	}
+
+	steps, err := repo.MigrateLegacyFiles(modelDir, false)
+	if err != nil {
+		t.Fatalf("MigrateLegacyFiles errored: %v", err)
+	}
+	if len(steps) != 1 || steps[0].Error != nil {
+		t.Fatalf("expected 1 successful step, got %d: %+v", len(steps), steps)
+	}
+
+	newPath := filepath.Join(modelDir, "0001-try-migration.md")
+	if steps[0].NewPath != newPath {
+		t.Errorf("step NewPath = %q, want %q", steps[0].NewPath, newPath)
+	}
+	if _, err := os.Stat(newPath); err != nil {
+		t.Errorf("expected new file %s: %v", newPath, err)
+	}
+	if _, err := os.Stat(legacyPath); !os.IsNotExist(err) {
+		t.Errorf("expected legacy file to be removed; stat err=%v", err)
+	}
+	content, err := os.ReadFile(newPath)
+	if err != nil {
+		t.Fatalf("ReadFile errored: %v", err)
+	}
+	for _, want := range []string{
+		"status: proposed",
+		"# Try migration",
+		"## Context and Problem Statement",
+		"## Considered Options",
+		"## Decision Drivers",
+		"* Adopt MADR",
+	} {
+		if !strings.Contains(string(content), want) {
+			t.Errorf("migrated file missing %q; got:\n%s", want, content)
+		}
+	}
+	if strings.Contains(string(content), `<a name=`) {
+		t.Errorf("migrated file still contains legacy anchors:\n%s", content)
+	}
+
+	// Idempotence: running again on the already-migrated dir finds nothing.
+	steps2, err := repo.MigrateLegacyFiles(modelDir, false)
+	if err != nil {
+		t.Fatalf("second MigrateLegacyFiles errored: %v", err)
+	}
+	if len(steps2) != 0 {
+		t.Errorf("expected 0 steps on second run; got %d: %+v", len(steps2), steps2)
+	}
+}
+
+// TestFileRepo_MigrateLegacyFiles_DryRunDoesNotWrite verifies that
+// --dry-run preserves the on-disk state. The returned steps describe what
+// would happen.
+func TestFileRepo_MigrateLegacyFiles_DryRunDoesNotWrite(t *testing.T) {
+	repo, modelDir := newRepoIn(t)
+
+	legacy := "---\nadr_id: \"0001\"\ntitle: dry\nstatus: open\n---\n\n## <a name=\"question\"></a> Question\n\nX\n"
+	legacyPath := filepath.Join(modelDir, "AD0001-dry.md")
+	if err := os.WriteFile(legacyPath, []byte(legacy), 0o644); err != nil {
+		t.Fatalf("WriteFile errored: %v", err)
+	}
+
+	steps, err := repo.MigrateLegacyFiles(modelDir, true)
+	if err != nil {
+		t.Fatalf("MigrateLegacyFiles errored: %v", err)
+	}
+	if len(steps) != 1 || !steps[0].DryRun {
+		t.Fatalf("expected 1 dry-run step; got %+v", steps)
+	}
+	// Original file must still be there.
+	if _, err := os.Stat(legacyPath); err != nil {
+		t.Errorf("dry-run should leave the legacy file in place; stat err=%v", err)
+	}
+	// And no new file written.
+	newPath := filepath.Join(modelDir, "0001-dry.md")
+	if _, err := os.Stat(newPath); !os.IsNotExist(err) {
+		t.Errorf("dry-run should not write the new file; stat err=%v", err)
+	}
+}
+
 // TestFileRepo_Save_RenamesFileWhenTitleChanges verifies that Save renames
 // the on-disk file when d.Title (and thus the derived slug) changes — the
 // promise PR 3's `adg edit --from-stdin` depends on for title rewrites.

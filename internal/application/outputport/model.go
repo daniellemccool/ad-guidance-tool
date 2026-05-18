@@ -32,3 +32,17 @@ type ValidationIssue struct {
 	ID      string
 	Message string
 }
+
+// ModelMigrate receives the per-file migration results.
+type ModelMigrate interface {
+	Migrated(steps []MigrationStep, dryRun bool)
+}
+
+// MigrationStep mirrors decision.MigrationStep for the outputport layer.
+// Error is a string (not error) so the outputport package stays free of
+// any non-stdlib dependency.
+type MigrationStep struct {
+	OldPath string
+	NewPath string
+	Error   string
+}

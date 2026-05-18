@@ -1,14 +1,18 @@
 package model
 
-import "fmt"
+import (
+	printer "adg/internal/adapter/printer"
+)
 
-type MergeModelsPresenter struct{}
+type MergeModelsPresenter struct {
+	s printer.Streams
+}
 
-func NewMergePresenter() *MergeModelsPresenter {
-	return &MergeModelsPresenter{}
+func NewMergePresenter(s printer.Streams) *MergeModelsPresenter {
+	return &MergeModelsPresenter{s: s}
 }
 
 func (p *MergeModelsPresenter) Merged(modelAPath, modelBPath, targetPath string, mergedDecisions int) error {
-	fmt.Printf("Successfully merged %d decisions from models %s and %s to new directory: %s\n", mergedDecisions, modelAPath, modelBPath, targetPath)
+	p.s.Status("Successfully merged %d decisions from models %s and %s to new directory: %s\n", mergedDecisions, modelAPath, modelBPath, targetPath)
 	return nil
 }

@@ -1,13 +1,17 @@
 package decision
 
-import "fmt"
+import (
+	printer "adg/internal/adapter/printer"
+)
 
-type EditDecisionPresenter struct{}
+type EditDecisionPresenter struct {
+	s printer.Streams
+}
 
-func NewEditPresenter() *EditDecisionPresenter {
-	return &EditDecisionPresenter{}
+func NewEditPresenter(s printer.Streams) *EditDecisionPresenter {
+	return &EditDecisionPresenter{s: s}
 }
 
 func (p *EditDecisionPresenter) Edited(decisionID string) {
-	fmt.Printf("Decision %s updated successfully.\n", decisionID)
+	p.s.Status("Decision %s updated successfully.\n", decisionID)
 }

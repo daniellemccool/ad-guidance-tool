@@ -7,15 +7,16 @@ import (
 )
 
 func init() {
+	s := streams()
 	rootCmd.AddCommand(
-		cmd.NewAddCommand(interactor.NewAddDecisionsInteractor(modelSvc, decisionSvc, print.NewAddPresenter()), configSvc),
-		cmd.NewCommentCommand(interactor.NewCommentDecisionInteractor(decisionSvc, print.NewCommentPresenter()), configSvc),
-		cmd.NewDecideCommand(interactor.NewDecideInteractor(decisionSvc, print.NewDecidePresenter()), configSvc),
-		cmd.NewEditCommand(interactor.NewEditDecisionInteractor(decisionSvc, print.NewEditPresenter()), configSvc),
-		cmd.NewLinkCommand(interactor.NewLinkDecisionsInteractor(decisionSvc, print.NewLinkPresenter()), configSvc),
-		cmd.NewListCommand(interactor.NewListDecisionsInteractor(decisionSvc, print.NewListPresenter()), configSvc),
-		cmd.NewPrintCommand(interactor.NewPrintDecisionsInteractor(decisionSvc, print.NewPrintPresenter()), configSvc),
-		cmd.NewReviseCommand(interactor.NewReviseDecisionInteractor(decisionSvc, print.NewRevisePresenter()), configSvc),
-		cmd.NewTagCommand(interactor.NewTagDecisionInteractor(decisionSvc, print.NewTagPresenter()), configSvc),
+		cmd.NewAddCommand(interactor.NewAddDecisionsInteractor(modelSvc, decisionSvc, print.NewAddPresenter(s)), configSvc),
+		cmd.NewCommentCommand(interactor.NewCommentDecisionInteractor(decisionSvc, print.NewCommentPresenter(s)), configSvc),
+		cmd.NewDecideCommand(interactor.NewDecideInteractor(decisionSvc, print.NewDecidePresenter(s)), configSvc),
+		cmd.NewEditCommand(interactor.NewEditDecisionInteractor(decisionSvc, print.NewEditPresenter(s)), configSvc),
+		cmd.NewLinkCommand(interactor.NewLinkDecisionsInteractor(decisionSvc, print.NewLinkPresenter(s)), configSvc),
+		cmd.NewListCommand(interactor.NewListDecisionsInteractor(decisionSvc, print.NewListPresenter(s)), configSvc),
+		cmd.NewPrintCommand(interactor.NewPrintDecisionsInteractor(decisionSvc, print.NewPrintPresenter(s)), configSvc),
+		cmd.NewReviseCommand(interactor.NewReviseDecisionInteractor(decisionSvc, print.NewRevisePresenter(s)), configSvc),
+		cmd.NewTagCommand(interactor.NewTagDecisionInteractor(decisionSvc, print.NewTagPresenter(s)), configSvc),
 	)
 }

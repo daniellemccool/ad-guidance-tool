@@ -3,18 +3,29 @@ package decision
 import (
 	"strings"
 	"testing"
+
+	"adg/internal/adapter/printer/printertest"
 )
 
-func TestCommented(t *testing.T) {
-	presenter := NewCommentPresenter()
+func TestCommented_StatusOnStderr(t *testing.T) {
+	s, out, err := printertest.Capture(false)
+	presenter := NewCommentPresenter(s)
 
-	output := captureOutput(func() {
-		presenter.Commented("0001", "alice", "Great idea!")
-	})
+	presenter.Commented("0001", "alice", "Great idea!")
 
-	expected := `Comment added by alice to decision 0001: "Great idea!"`
+	if out.String() != "" {
+		t.Errorf("stdout should be empty; got %q", out.String())
+	}
+	if !strings.Contains(err.String(), `Comment added by alice to decision 0001: "Great idea!"`) {
+		t.Errorf("stderr missing status: %q", err.String())
+	}
+}
 
-	if !strings.Contains(output, expected) {
-		t.Errorf("Expected output to contain: %q\nGot: %q", expected, output)
+func TestCommented_Quiet_Suppresses(t *testing.T) {
+	s, _, err := printertest.Capture(true)
+	presenter := NewCommentPresenter(s)
+	presenter.Commented("0001", "alice", "x")
+	if err.String() != "" {
+		t.Errorf("stderr should be empty under --quiet; got %q", err.String())
 	}
 }

@@ -1,29 +1,40 @@
 package model
 
 import (
+	printer "adg/internal/adapter/printer"
 	"adg/internal/application/outputport"
-	"fmt"
 )
 
-type ModelValidatePresenter struct{}
-
-func NewModelValidatePresenter() *ModelValidatePresenter {
-	return &ModelValidatePresenter{}
+// ModelValidatePresenter prints the validation issue list to stderr and
+// remembers whether issues were found so the cobra layer can map that to
+// a non-zero exit code.
+type ModelValidatePresenter struct {
+	s         printer.Streams
+	hadIssues bool
 }
 
-// ModelValidated prints per-decision issue reports. On a clean run nothing is
-// printed for OK decisions in this PR — that's expedient; the `--quiet` flag
-// from §C.6 lands in PR 2 where the output style is finalized. A non-empty
-// issue list still results in a non-zero command exit because the cmd layer
-// inspects the printer's "had issues" state via the returned bool — for now
-// the presenter just prints; the exit-code mapping is also a PR 2 concern.
+func NewModelValidatePresenter(s printer.Streams) *ModelValidatePresenter {
+	return &ModelValidatePresenter{s: s}
+}
+
+// ModelValidated prints per-decision issue reports. The output goes to
+// stderr because it is human-readable status, not machine data.
+// `--quiet` suppresses the "model is valid" line but not the issue list;
+// validation issues are errors and remain visible.
 func (p *ModelValidatePresenter) ModelValidated(modelName string, issues []outputport.ValidationIssue) {
 	if len(issues) == 0 {
-		fmt.Printf("%s model is valid\n", modelName)
+		p.s.Status("%s model is valid\n", modelName)
 		return
 	}
-	fmt.Printf("%s model has %d validation issue(s):\n", modelName, len(issues))
+	p.hadIssues = true
+	p.s.Errf("%s model has %d validation issue(s):\n", modelName, len(issues))
 	for _, issue := range issues {
-		fmt.Printf("  ID %s: %s\n", issue.ID, issue.Message)
+		p.s.Errf("  ID %s: %s\n", issue.ID, issue.Message)
 	}
+}
+
+// HadIssues reports whether the most recent ModelValidated call observed
+// any issues. The cobra command checks this to decide its exit code.
+func (p *ModelValidatePresenter) HadIssues() bool {
+	return p.hadIssues
 }

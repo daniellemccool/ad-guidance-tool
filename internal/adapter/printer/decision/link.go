@@ -1,16 +1,20 @@
 package decision
 
-import "fmt"
+import (
+	printer "adg/internal/adapter/printer"
+)
 
-type LinkPresenter struct{}
+type LinkPresenter struct {
+	s printer.Streams
+}
 
-func NewLinkPresenter() *LinkPresenter {
-	return &LinkPresenter{}
+func NewLinkPresenter(s printer.Streams) *LinkPresenter {
+	return &LinkPresenter{s: s}
 }
 
 func (p *LinkPresenter) Linked(sourceID, targetID, tag, reverseTag string) {
-	fmt.Printf("Link added: %s →[%s]→ %s\n", sourceID, tag, targetID)
+	p.s.Status("Link added: %s →[%s]→ %s\n", sourceID, tag, targetID)
 	if reverseTag != "" {
-		fmt.Printf("Reverse link added: %s →[%s]→ %s\n", targetID, reverseTag, sourceID)
+		p.s.Status("Reverse link added: %s →[%s]→ %s\n", targetID, reverseTag, sourceID)
 	}
 }

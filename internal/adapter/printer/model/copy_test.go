@@ -1,28 +1,22 @@
 package model
 
 import (
-	"bytes"
-	"io"
-	"os"
 	"testing"
+
+	"adg/internal/adapter/printer/printertest"
 )
 
-func TestCopyModelPresenter_Copied(t *testing.T) {
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+func TestCopyModelPresenter_StatusOnStderr(t *testing.T) {
+	s, out, err := printertest.Capture(false)
+	presenter := NewCopyPresenter(s)
 
-	presenter := NewCopyPresenter()
 	presenter.Copied("source-model", "target-model", 3)
 
-	w.Close()
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
-	os.Stdout = oldStdout
-
+	if out.String() != "" {
+		t.Errorf("stdout should be empty; got %q", out.String())
+	}
 	expected := "Successfully copied 3 decisions from model source-model to new model target-model\n"
-	actual := buf.String()
-	if actual != expected {
-		t.Errorf("expected output %q, got %q", expected, actual)
+	if got := err.String(); got != expected {
+		t.Errorf("stderr = %q, want %q", got, expected)
 	}
 }

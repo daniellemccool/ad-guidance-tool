@@ -1,22 +1,22 @@
 package decision
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"adg/internal/adapter/printer/printertest"
 )
 
-func TestDecided(t *testing.T) {
-	presenter := NewDecidePresenter()
-	decisionID := "0010"
+func TestDecided_StatusOnStderr(t *testing.T) {
+	s, out, err := printertest.Capture(false)
+	presenter := NewDecidePresenter(s)
 
-	output := captureOutput(func() {
-		presenter.Decided(decisionID)
-	})
+	presenter.Decided("0010")
 
-	expected := fmt.Sprintf("Decision %s has been marked as decided.\n", decisionID)
-	assert.Equal(t, expected, output)
-	assert.True(t, strings.Contains(output, decisionID))
+	if out.String() != "" {
+		t.Errorf("stdout should be empty; got %q", out.String())
+	}
+	if !strings.Contains(err.String(), "Decision 0010 has been marked as decided.") {
+		t.Errorf("stderr missing status: %q", err.String())
+	}
 }

@@ -9,12 +9,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// todo: rename all related functions and files to view
+// NewPrintCommand wires the `adg view` cobra command. Section flag names use
+// MADR vocabulary: `--context` for the question section (renamed in MADR to
+// "Context and Problem Statement") and `--drivers` for what was "Criteria" in
+// the legacy ADG template. With no section flags specified, the full body is
+// printed.
+//
+// todo: rename all related functions and files to view.
 func NewPrintCommand(input inputport.DecisionPrint, config domain.ConfigService) *cobra.Command {
 	var err error
 	var modelPath string
 	var idsOrTitles, ids, titles []string
-	var printQuestion, printOptions, printCriteria, printComments, printOutcome bool
+	var printContext, printDrivers, printOptions, printOutcome, printComments bool
 
 	cmd := &cobra.Command{
 		Use:   "view",
@@ -41,20 +47,20 @@ func NewPrintCommand(input inputport.DecisionPrint, config domain.ConfigService)
 				return fmt.Errorf("at least one --id or --title must be provided")
 			}
 
-			if !printQuestion && !printOptions && !printCriteria && !printComments && !printOutcome {
-				printQuestion = true
+			if !printContext && !printDrivers && !printOptions && !printOutcome && !printComments {
+				printContext = true
+				printDrivers = true
 				printOptions = true
-				printCriteria = true
-				printComments = true
 				printOutcome = true
+				printComments = true
 			}
 
 			sections := map[string]bool{
-				"question": printQuestion,
+				"context":  printContext,
+				"drivers":  printDrivers,
 				"options":  printOptions,
-				"criteria": printCriteria,
-				"comments": printComments,
 				"outcome":  printOutcome,
+				"comments": printComments,
 			}
 
 			return input.Print(modelPath, ids, titles, sections)
@@ -64,11 +70,11 @@ func NewPrintCommand(input inputport.DecisionPrint, config domain.ConfigService)
 	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the decision model directory")
 	cmd.Flags().StringSliceVar(&idsOrTitles, "id", nil, "IDs or titles of the decisions to print (e.g. 0001, 'my-decision') (can be repeated)")
 
-	cmd.Flags().BoolVar(&printQuestion, "question", false, "Print the Question section")
-	cmd.Flags().BoolVar(&printOptions, "options", false, "Print the Options section")
-	cmd.Flags().BoolVar(&printCriteria, "criteria", false, "Print the Criteria section")
+	cmd.Flags().BoolVar(&printContext, "context", false, "Print the Context and Problem Statement section")
+	cmd.Flags().BoolVar(&printDrivers, "drivers", false, "Print the Decision Drivers section")
+	cmd.Flags().BoolVar(&printOptions, "options", false, "Print the Considered Options section")
+	cmd.Flags().BoolVar(&printOutcome, "outcome", false, "Print the Decision Outcome section")
 	cmd.Flags().BoolVar(&printComments, "comments", false, "Print the Comments section")
-	cmd.Flags().BoolVar(&printOutcome, "outcome", false, "Print the Outcome section")
 
 	return cmd
 }

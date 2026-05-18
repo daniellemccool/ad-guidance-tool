@@ -15,11 +15,11 @@ func TestNewPrintCommand_AllSectionsDefaulted(t *testing.T) {
 	mockConfig.On("IsLoaded").Return(true)
 	mockConfig.On("GetDefaultModelPath").Return("resolvedPath")
 	mockInput.On("Print", "resolvedPath", []string{"0001"}, []string{"My Decision"}, map[string]bool{
-		"question": true,
+		"context":  true,
+		"drivers":  true,
 		"options":  true,
-		"criteria": true,
-		"comments": true,
 		"outcome":  true,
+		"comments": true,
 	}).Return(nil)
 
 	cmd := NewPrintCommand(mockInput, mockConfig)
@@ -38,16 +38,16 @@ func TestNewPrintCommand_CustomSectionsSelected(t *testing.T) {
 	mockConfig.On("IsLoaded").Return(true)
 	mockConfig.On("GetDefaultModelPath").Return("resolvedPath")
 	mockInput.On("Print", "resolvedPath", []string{"0001"}, []string(nil), map[string]bool{
-		"question": true,
+		"context":  true,
+		"drivers":  false,
 		"options":  false,
-		"criteria": false,
-		"comments": false,
 		"outcome":  false,
+		"comments": false,
 	}).Return(nil)
 
 	cmd := NewPrintCommand(mockInput, mockConfig)
 	cmd.SetArgs([]string{
-		"--id", "0001", "--question",
+		"--id", "0001", "--context",
 	})
 
 	err := cmd.Execute()

@@ -16,10 +16,6 @@ type ModelMerge interface {
 	Merged(modelAPath, modelBPath, targetPath string, mergedDecisions int) error
 }
 
-type ModelRebuildIndex interface {
-	IndexRebuilt(modelName string)
-}
-
 // ModelValidate receives the list of validation issues from `adg validate`.
 // The legacy interface returned two error pointers (one for index, one for
 // data) which were specific to the index-vs-files reconciliation logic that

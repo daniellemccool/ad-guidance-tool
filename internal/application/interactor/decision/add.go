@@ -31,7 +31,7 @@ func (i *AddDecisionsInteractor) Add(modelPath string, titles []string) error {
 	failures := make(map[string]error)
 
 	if !i.modelService.Exists(modelPath) {
-		return fmt.Errorf("can not add decisions, index of model %q does not exist (use rebuild to recreate index file if directory actually does contain decisions)", modelPath)
+		return fmt.Errorf("can not add decisions, model directory %q does not exist (run `adg init %s` to create it)", modelPath, modelPath)
 	}
 
 	for _, title := range titles {

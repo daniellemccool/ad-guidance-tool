@@ -1,5 +1,11 @@
 # PR 1a — MADR Parser, Renderer, Types (Additive Subpackage)
 
+> **Historical artifact (kept for context).** This is the original
+> implementation plan for PR 1a. The PR shipped and merged; subsequent
+> PRs 1b–4 evolved the design in ways this plan didn't anticipate.
+> For the authoritative record of ratified fork-design decisions, see
+> [`docs/fork-design/`](../../fork-design/).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Land all the MADR-shaped types, body and frontmatter parser, renderer, fixture set, and round-trip property test as a new `internal/domain/decision/madr/` subpackage. **Purely additive**: no existing code is modified or deleted. After this PR, `go build ./...` and `go test ./...` both pass; the new package is used by no one yet.

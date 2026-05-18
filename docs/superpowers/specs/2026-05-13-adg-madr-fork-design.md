@@ -1,5 +1,15 @@
 # ADG MADR-Native Fork — Design Spec
 
+> **Historical artifact (kept for context).** This is the original
+> design spec written before implementation began. It contains open
+> questions and recommendations that have since been ratified — most
+> notably the decision to drop `index.yaml` entirely. For the
+> authoritative, ratified record of the fork's design decisions, see
+> [`docs/fork-design/`](../../fork-design/). The implementation in
+> PRs 1a–4 deviates from this spec wherever planning-stage assumptions
+> changed; this document is preserved as a record of how the design
+> evolved, not as a current source of truth.
+
 **Date:** 2026-05-13
 **Status:** Draft for review
 **Scope:** Fork `github.com/adr/ad-guidance-tool` to `github.com/daniellemccool/ad-guidance-tool`. Convert the file format from ADG's HTML-anchor-based layout to MADR 4.0–native markdown. Fold the originally-planned §A (data integrity) and §B (workflow ergonomics) bug fixes into this refactor.

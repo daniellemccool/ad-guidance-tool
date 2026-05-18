@@ -1,7 +1,5 @@
 ---
-adr_id: "0010"
-title: define-error-handling-strategy
-status: open
+status: proposed
 tags:
     - error-handling
     - exceptions
@@ -12,21 +10,19 @@ links:
         - "0011"
     succeeds:
         - "0009"
-comments: []
 ---
 
-## <a name="question"></a> Question
+# Define error handling strategy
 
+## Context and Problem Statement
 What strategy should be used for handling and propagating errors across architectural layers in a way that preserves separation of concerns and keeps business logic independent of frameworks?
 
-## <a name="options"></a> Options
+## Considered Options
+* Use return types (e.g., error objects or `Result` types) at every boundary, avoiding exceptions or panic flows.
+* Allow exceptions or panics in outer layers, but catch and translate them into controlled forms before reaching core layers.
+* Propagate exceptions across all layers with a global handler that maps them to user-facing responses.
 
-1. <a name="option-1"></a> Use return types (e.g., error objects or `Result` types) at every boundary, avoiding exceptions or panic flows.
-2. <a name="option-2"></a> Allow exceptions or panics in outer layers, but catch and translate them into controlled forms before reaching core layers.
-3. <a name="option-3"></a> Propagate exceptions across all layers with a global handler that maps them to user-facing responses.
-
-## <a name="criteria"></a> Criteria
-
+## Decision Drivers
 - Transparency and consistency of error behavior
 - Coupling introduced between layers through exception types
 - Ease of testing and mocking error paths

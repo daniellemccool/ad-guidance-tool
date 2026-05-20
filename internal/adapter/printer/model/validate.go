@@ -17,13 +17,34 @@ func NewModelValidatePresenter(s printer.Streams) *ModelValidatePresenter {
 	return &ModelValidatePresenter{s: s}
 }
 
+// validateChecks describes the checks performed by domain/model.Validate, in
+// the order they appear in the per-decision pass. Hard-coded here so the
+// "all green" summary can enumerate them — the user feedback was that an
+// unadorned "model is valid" line leaves operators guessing whether a rule
+// they care about is actually covered. Keep this in sync with the rules block
+// in internal/domain/model/service.go::Validate.
+var validateChecks = []string{
+	"filenames match NNNN-slug.md",
+	"H1 titles present",
+	"required sections present (Context, Considered Options, Decision Outcome)",
+	"Considered Options bullets present",
+	"accepted ADRs have a valid Chosen option",
+	"status vocabulary",
+	"supersession links (forward + reverse integrity)",
+	"comments well-formed (non-empty, non-numeric placeholder)",
+}
+
 // ModelValidated prints per-decision issue reports. The output goes to
 // stderr because it is human-readable status, not machine data.
-// `--quiet` suppresses the "model is valid" line but not the issue list;
-// validation issues are errors and remain visible.
-func (p *ModelValidatePresenter) ModelValidated(modelName string, issues []outputport.ValidationIssue) {
+// `--quiet` suppresses the "model is valid" line AND the checklist; failure
+// output (the issue list) is always written because issues are errors.
+func (p *ModelValidatePresenter) ModelValidated(modelName string, scanned int, issues []outputport.ValidationIssue) {
 	if len(issues) == 0 {
 		p.s.Status("%s model is valid\n", modelName)
+		p.s.Status("  ✓ %d ADR(s) scanned\n", scanned)
+		for _, check := range validateChecks {
+			p.s.Status("  ✓ %s\n", check)
+		}
 		return
 	}
 	p.hadIssues = true

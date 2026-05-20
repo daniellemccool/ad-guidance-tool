@@ -13,9 +13,9 @@ type ModelValidate struct {
 	mock.Mock
 }
 
-// ModelValidated provides a mock function with given fields: modelName, issues
-func (_m *ModelValidate) ModelValidated(modelName string, issues []outputport.ValidationIssue) {
-	_m.Called(modelName, issues)
+// ModelValidated provides a mock function with given fields: modelName, scanned, issues
+func (_m *ModelValidate) ModelValidated(modelName string, scanned int, issues []outputport.ValidationIssue) {
+	_m.Called(modelName, scanned, issues)
 }
 
 // NewModelValidate creates a new instance of ModelValidate. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

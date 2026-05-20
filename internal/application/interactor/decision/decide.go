@@ -20,7 +20,7 @@ func NewDecideInteractor(service domain.DecisionService, output outputport.Decis
 	}
 }
 
-func (i *DecideDecisionInteractor) Decide(modelPath, id, title, option, reason, author string, enforceOption bool) error {
+func (i *DecideDecisionInteractor) Decide(modelPath, id, title, option, reason, author string, force bool) error {
 	var (
 		decision *domain.Decision
 		err      error
@@ -31,11 +31,11 @@ func (i *DecideDecisionInteractor) Decide(modelPath, id, title, option, reason, 
 		return err
 	}
 
-	if decision.Status == "decided" {
-		return fmt.Errorf("decision has already been decided, revise the decision to create a copy that is still open")
+	if (decision.Status == "accepted" || decision.Status == "decided") && !force {
+		return fmt.Errorf("decision is already %s; use --force to re-decide (or `adg revise` to create a new proposed copy)", decision.Status)
 	}
 
-	if err := i.service.Decide(modelPath, decision, option, reason, enforceOption); err != nil {
+	if err := i.service.Decide(modelPath, decision, option, reason, force); err != nil {
 		return err
 	}
 

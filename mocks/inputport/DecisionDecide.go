@@ -9,9 +9,9 @@ type DecisionDecide struct {
 	mock.Mock
 }
 
-// Decide provides a mock function with given fields: modelPath, id, title, option, reason, author, enforceOption
-func (_m *DecisionDecide) Decide(modelPath string, id string, title string, option string, reason string, author string, enforceOption bool) error {
-	ret := _m.Called(modelPath, id, title, option, reason, author, enforceOption)
+// Decide provides a mock function with given fields: modelPath, id, title, option, reason, author, force
+func (_m *DecisionDecide) Decide(modelPath string, id string, title string, option string, reason string, author string, force bool) error {
+	ret := _m.Called(modelPath, id, title, option, reason, author, force)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Decide")
@@ -19,7 +19,7 @@ func (_m *DecisionDecide) Decide(modelPath string, id string, title string, opti
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, string, string, string, string, string, bool) error); ok {
-		r0 = rf(modelPath, id, title, option, reason, author, enforceOption)
+		r0 = rf(modelPath, id, title, option, reason, author, force)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -12,7 +12,7 @@ type DecisionComment interface {
 }
 
 type DecisionDecide interface {
-	Decide(modelPath, id, title, option, reason, author string, enforceOption bool) error
+	Decide(modelPath, id, title, option, reason, author string, force bool) error
 }
 
 type DecisionEdit interface {

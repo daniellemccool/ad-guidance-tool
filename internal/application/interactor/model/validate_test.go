@@ -18,8 +18,8 @@ func TestValidate_NoIssues(t *testing.T) {
 
 	modelPath := "model"
 
-	mockSvc.On("Validate", modelPath).Return([]modeldomain.ValidationIssue{}, nil)
-	mockOutput.On("ModelValidated", modelPath, []outputport.ValidationIssue{}).Return()
+	mockSvc.On("Validate", modelPath).Return(7, []modeldomain.ValidationIssue{}, nil)
+	mockOutput.On("ModelValidated", modelPath, 7, []outputport.ValidationIssue{}).Return()
 
 	interactor := NewModelValidateInteractor(mockSvc, mockOutput)
 
@@ -45,8 +45,8 @@ func TestValidate_MapsIssues(t *testing.T) {
 		{ID: "0002", Message: "missing required section: Decision Outcome"},
 	}
 
-	mockSvc.On("Validate", modelPath).Return(domainIssues, nil)
-	mockOutput.On("ModelValidated", modelPath, expectedOut).Return()
+	mockSvc.On("Validate", modelPath).Return(2, domainIssues, nil)
+	mockOutput.On("ModelValidated", modelPath, 2, expectedOut).Return()
 
 	interactor := NewModelValidateInteractor(mockSvc, mockOutput)
 
@@ -63,7 +63,7 @@ func TestValidate_PropagatesError(t *testing.T) {
 
 	modelPath := "model"
 
-	mockSvc.On("Validate", modelPath).Return(nil, errors.New("read error"))
+	mockSvc.On("Validate", modelPath).Return(0, nil, errors.New("read error"))
 
 	interactor := NewModelValidateInteractor(mockSvc, mockOutput)
 

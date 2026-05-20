@@ -22,7 +22,7 @@ func NewModelValidateInteractor(
 }
 
 func (i *ModelValidateInteractor) Validate(modelPath string) error {
-	issues, err := i.service.Validate(modelPath)
+	scanned, issues, err := i.service.Validate(modelPath)
 	if err != nil {
 		return err
 	}
@@ -31,6 +31,6 @@ func (i *ModelValidateInteractor) Validate(modelPath string) error {
 	for _, issue := range issues {
 		out = append(out, outputport.ValidationIssue{ID: issue.ID, Message: issue.Message})
 	}
-	i.output.ModelValidated(modelPath, out)
+	i.output.ModelValidated(modelPath, scanned, out)
 	return nil
 }

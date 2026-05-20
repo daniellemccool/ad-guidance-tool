@@ -48,7 +48,7 @@ func (r *FileDecisionRepository) Create(modelPath, subFolderPath string, d *doma
 			return nil, fmt.Errorf("ADR %s already exists at %s", d.ID, existing)
 		}
 	}
-	slug, err := slugify(d.Title)
+	slug, err := domain.Slugify(d.Title)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (r *FileDecisionRepository) Save(modelPath string, d *domain.Decision, body
 	if err != nil {
 		return err
 	}
-	slug, err := slugify(d.Title)
+	slug, err := domain.Slugify(d.Title)
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,7 @@ func (r *FileDecisionRepository) LoadByTitle(modelPath, title string) (*domain.D
 	if err != nil {
 		return nil, err
 	}
-	slug, err := slugify(title)
+	slug, err := domain.Slugify(title)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +264,7 @@ func (r *FileDecisionRepository) MigrateLegacyFiles(modelPath string, dryRun boo
 		}
 		d.ID = id
 
-		slug, sErr := slugify(d.Title)
+		slug, sErr := domain.Slugify(d.Title)
 		if sErr != nil {
 			steps = append(steps, domain.MigrationStep{OldPath: path, DryRun: dryRun, Error: sErr})
 			return nil
@@ -403,31 +403,3 @@ func (r *FileDecisionRepository) generateNextID(modelPath string) (string, error
 	return fmt.Sprintf("%04d", maxID+1), nil
 }
 
-// slugify converts a title into a filename-safe slug. Any rune outside
-// [a-z0-9-] is replaced with '-' (not stripped) so word boundaries from
-// punctuation, underscores, and type parameters survive — e.g.
-// `VecDeque<u8>` becomes `vecdeque-u8` rather than `vecdequeu8`. Consecutive
-// '-' collapse to one and leading/trailing '-' are trimmed. An empty result
-// returns an error so the AddNew flow surfaces a clear failure instead of
-// writing `NNNN-.md`.
-func slugify(title string) (string, error) {
-	var b strings.Builder
-	prevDash := true // treat start-of-string as already-dashed so we trim leading '-'
-	for _, r := range strings.ToLower(title) {
-		switch {
-		case (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'):
-			b.WriteRune(r)
-			prevDash = false
-		default:
-			if !prevDash {
-				b.WriteByte('-')
-				prevDash = true
-			}
-		}
-	}
-	slug := strings.TrimRight(b.String(), "-")
-	if slug == "" {
-		return "", fmt.Errorf("title %q slugifies to empty; please include at least one letter or digit", title)
-	}
-	return slug, nil
-}

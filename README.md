@@ -79,7 +79,8 @@ After `adg comment`, the frontmatter grows a `comments:` list and a `## Comments
 | `edit --id <id> [--context ... \| --drivers ... \| --option ...]` | Append to a section. |
 | `edit --id <id> --from-stdin\|--from-file <path> [--force]` | Replace the decision body. Status-gated: non-proposed decisions require `--force`. |
 | `comment --id <id> --author <name> --text <text>` | Append a comment. Text is preserved verbatim. |
-| `decide --id <id> --option <name-or-number> [--rationale <text>]` | Set status to accepted and write the MADR "Chosen option: ..." line. |
+| `decide --id <id> --option <name-or-number> [--rationale <text>] [--force]` | Set status to accepted and write the MADR "Chosen option: ..." line. The option must already exist in Considered Options (use `edit --option` first to add new ones). `--force` bypasses two guards: re-deciding an already-accepted ADR, and overwriting a Decision Outcome that contains author-written content (including any nested `### Consequences`). |
+| `slug "<title>"` | Print the slug that `add` would produce for a title, without creating anything. Useful when plan briefs need to reference `NNNN-<slug>.md` filenames before the ADR exists. |
 | `link --source <id> --target <id> --tag <name> [--reverse-tag <name>]` | Add a custom link. Supersession has its own command — see below. |
 | `supersede --new <id> --old <id> [--rationale <text>]` | Mark `new` as superseding `old`. Bidirectional: writes `Supersedes` list on new and `superseded by ADR-N` status on old. Auto-promotes new to `accepted`. |
 | `migrate [--dry-run]` | Convert upstream ADG files (`AD\d{4}-slug.md` with HTML anchors and `status: open\|decided`) into MADR shape. In-place; idempotent. |

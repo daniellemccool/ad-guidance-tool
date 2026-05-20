@@ -33,7 +33,7 @@ type DecisionService interface {
 	Link(modelPath string, source, target *Decision, forwardTag, reverseTag string) error
 	Tag(modelPath string, decision *Decision, tag string) error
 	FilterDecisions(decisions []Decision, filters map[string][]string) ([]Decision, error)
-	Decide(modelPath string, decision *Decision, option, rationale string, enforceOption bool) error
+	Decide(modelPath string, decision *Decision, option, rationale string, force bool) error
 	Revise(modelPath string, original *Decision) (*Decision, error)
 	Copy(sourceModelPath, targetPath, decisionID string) error
 	Comment(modelPath string, decision *Decision, author, text string) error
@@ -260,10 +260,17 @@ func (s *DecisionServiceImplementation) FilterDecisions(decisions []Decision, fi
 }
 
 // Decide writes the MADR `Chosen option: "X", because Y.` line into Decision
-// Outcome and flips status to accepted. enforceOption=true preserves the legacy
-// behavior of auto-creating an option that wasn't in Considered Options; the
-// MADR-purist rejection of this behavior lands in PR 2.
-func (s *DecisionServiceImplementation) Decide(modelPath string, d *Decision, option, rationale string, enforceOption bool) error {
+// Outcome and flips status to accepted. The option must already exist in
+// Considered Options — MADR's principle is that decisions are made among
+// previously considered alternatives; use `adg edit` to add a new option
+// before deciding.
+//
+// Decide refuses to overwrite a Decision Outcome that contains anything
+// beyond the canonical placeholder (i.e. content the author wrote), unless
+// force is true. This guard exists because `replaceSection` wipes the entire
+// `## Decision Outcome` block including any nested `### Consequences` H3,
+// so an author-curated body would be silently destroyed otherwise.
+func (s *DecisionServiceImplementation) Decide(modelPath string, d *Decision, option, rationale string, force bool) error {
 	body, err := s.repo.LoadBody(modelPath, d.ID)
 	if err != nil {
 		return err
@@ -275,14 +282,11 @@ func (s *DecisionServiceImplementation) Decide(modelPath string, d *Decision, op
 
 	chosen, err := resolveOption(parsed.Options, option)
 	if err != nil {
-		if !enforceOption {
-			return fmt.Errorf("%w (use --force to add the option automatically)", err)
-		}
-		if isNumeric(option) {
-			return fmt.Errorf("cannot auto-create numeric option: %q; use a descriptive name when using --force", option)
-		}
-		body = appendBulletsToSection(body, "Considered Options", []string{option})
-		chosen = option
+		return fmt.Errorf("%w (add the option via `adg edit` first)", err)
+	}
+
+	if !force && !isPlaceholderDecisionOutcome(parsed.Sections["outcome"]) {
+		return errors.New("Decision Outcome has non-placeholder content; either edit manually or invoke with --force to overwrite (this will replace any nested ### Consequences subsection as well)")
 	}
 
 	outcome := fmt.Sprintf("## Decision Outcome\n\nChosen option: %q", chosen)
@@ -296,6 +300,52 @@ func (s *DecisionServiceImplementation) Decide(modelPath string, d *Decision, op
 	d.Date = time.Now().Format("2006-01-02")
 	d.LegacyOutcome = false
 	return s.repo.Save(modelPath, d, body)
+}
+
+// placeholderOutcomeContents is the set of "the author hasn't written here yet"
+// shapes for the Decision Outcome section body (everything after the `## Decision
+// Outcome` header line). Anything else is considered authored content that Decide
+// must not destroy without --force.
+//
+//   - "" matches an empty section (just the header, no content).
+//   - "{...}" matches what Revise writes when creating a fresh copy.
+//   - The canonicalTemplate-derived shape matches what `adg add` writes for a
+//     brand-new ADR; the nested `### Consequences` H3 is part of the placeholder
+//     because the parser includes it in Sections["outcome"] (it's H3, not H2).
+var placeholderOutcomeContents = []string{
+	"",
+	"{...}",
+	`Chosen option: "{option title}", because {justification}.
+
+### Consequences
+
+* Good, because {...}
+* Bad, because {...}`,
+}
+
+func isPlaceholderDecisionOutcome(outcomeSection string) bool {
+	content := stripH2Header(outcomeSection)
+	norm := normalizeBlankLines(strings.TrimSpace(content))
+	for _, p := range placeholderOutcomeContents {
+		if norm == normalizeBlankLines(strings.TrimSpace(p)) {
+			return true
+		}
+	}
+	return false
+}
+
+func stripH2Header(section string) string {
+	lines := strings.Split(section, "\n")
+	if len(lines) > 0 && strings.HasPrefix(strings.TrimSpace(lines[0]), "## ") {
+		lines = lines[1:]
+	}
+	return strings.Join(lines, "\n")
+}
+
+var multiBlankRe = regexp.MustCompile(`\n[ \t]*\n[ \t\n]*`)
+
+func normalizeBlankLines(s string) string {
+	return multiBlankRe.ReplaceAllString(s, "\n\n")
 }
 
 func (s *DecisionServiceImplementation) Revise(modelPath string, original *Decision) (*Decision, error) {
@@ -414,11 +464,6 @@ func (s *DecisionServiceImplementation) Supersede(modelPath string, newD, oldD *
 func containsLetter(s string) bool {
 	matched, err := regexp.MatchString(`[a-zA-Z]`, s)
 	return err == nil && matched
-}
-
-func isNumeric(input string) bool {
-	_, err := strconv.Atoi(input)
-	return err == nil
 }
 
 func adjustIDsBy(ids []string, delta int) []string {

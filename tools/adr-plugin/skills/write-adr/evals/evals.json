@@ -1,0 +1,94 @@
+{
+  "skill_name": "write-adr",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Record an architectural decision: we'll store service configuration in TOML rather than JSON, because operators edit these files by hand and need comments and trailing-comma tolerance. We considered JSON (ubiquitous but no comments), YAML (comments, but whitespace-sensitive and error-prone for operators), and TOML. We chose TOML.",
+      "expected_output": "A small ADR created in docs/decisions via adg (add -> edit --from-stdin -> decide), with TOML as the chosen option. `adg validate` passes. No template scaffolding left in the accepted file.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "adr_file_created",
+          "description": "An ADR NNNN-slug.md file exists under docs/decisions",
+          "check": "docs/decisions/ contains at least one NNNN-slug.md file matching the decision"
+        },
+        {
+          "id": "driven_through_adg",
+          "description": "Content was created with adg commands, not by hand-editing the markdown",
+          "check": "summary mentions adg add / adg edit --from-stdin / adg decide (no direct file authoring)"
+        },
+        {
+          "id": "correct_decision_chosen",
+          "description": "TOML is the chosen option in the Decision Outcome",
+          "check": "the accepted ADR's Decision Outcome line names TOML"
+        },
+        {
+          "id": "validates_clean",
+          "description": "adg validate passes — no leftover {...} tokens, no empty required sections",
+          "check": "adg validate --model docs/decisions exits zero; the file contains no template placeholder tokens"
+        },
+        {
+          "id": "small_form",
+          "description": "The ADR stays decision-focused (no Pros/Cons matrix or Confirmation dump for a clear-cut call)",
+          "check": "the file is roughly within the small form factor (well under ~60 lines)"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "I notice every outbound HTTP client in the codebase wraps calls in retry-with-exponential-backoff-and-jitter, and new code keeps reinventing it slightly differently. Should this be an ADR? If so, write it — the pattern exists because the upstream APIs rate-limit aggressively and uniform jitter avoids thundering-herd retries.",
+      "expected_output": "The skill affirms this warrants an ADR (a consistent pattern future authors must follow), then creates one in docs/decisions capturing the why (rate limits, thundering-herd) and the chosen approach (a single shared backoff+jitter helper). adg validate passes.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "judged_adr_worthy",
+          "description": "Agent explicitly decides the pattern is worth recording",
+          "check": "summary contains an affirmative judgment that this warrants an ADR"
+        },
+        {
+          "id": "adr_file_created",
+          "description": "An ADR NNNN-slug.md file exists under docs/decisions",
+          "check": "docs/decisions/ contains at least one NNNN-slug.md file matching the decision"
+        },
+        {
+          "id": "captures_motivation",
+          "description": "ADR records the driver (rate limiting / thundering herd)",
+          "check": "the ADR Context or Drivers mention rate limiting or thundering-herd retries"
+        },
+        {
+          "id": "validates_clean",
+          "description": "adg validate passes",
+          "check": "adg validate --model docs/decisions exits zero"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "We're weighing how to deliver large files out of the worker without OOMing: keep the current in-memory buffer, stream to a temp file, or add a capability-flag opt-in for streaming. We haven't decided yet — capture the open decision so it's on record while we prototype.",
+      "expected_output": "A proposed (undecided) ADR in docs/decisions with the three options recorded and Decision Outcome left as the {...} placeholder. No `adg decide` is run. adg validate passes (proposed stubs are exempt from the finished-record checks).",
+      "files": [],
+      "assertions": [
+        {
+          "id": "adr_file_created",
+          "description": "An ADR NNNN-slug.md file exists under docs/decisions",
+          "check": "docs/decisions/ contains at least one NNNN-slug.md file matching the decision"
+        },
+        {
+          "id": "left_proposed",
+          "description": "The ADR is left unresolved (status proposed, outcome is a placeholder)",
+          "check": "the file's status is proposed and Decision Outcome is {...}; adg decide was not run"
+        },
+        {
+          "id": "records_all_options",
+          "description": "All three considered options are present",
+          "check": "Considered Options lists the in-memory buffer, temp-file streaming, and capability-flag options"
+        },
+        {
+          "id": "validates_clean",
+          "description": "adg validate passes for the proposed stub",
+          "check": "adg validate --model docs/decisions exits zero"
+        }
+      ]
+    }
+  ]
+}

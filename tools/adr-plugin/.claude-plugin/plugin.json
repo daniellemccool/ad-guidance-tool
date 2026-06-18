@@ -1,0 +1,9 @@
+{
+  "name": "write-adr",
+  "version": "0.1.0",
+  "description": "Create and manage Architectural Decision Records in MADR format with the adg CLI. Ships with ad-guidance-tool so the guidance tracks the tool's CLI in lockstep.",
+  "author": {
+    "name": "Danielle McCool"
+  },
+  "homepage": "https://github.com/daniellemccool/ad-guidance-tool"
+}

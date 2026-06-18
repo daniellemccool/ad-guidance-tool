@@ -1,0 +1,16 @@
+{
+  "name": "ad-guidance-tool",
+  "description": "Plugins shipped alongside the adg CLI, so guidance tracks the tool in lockstep.",
+  "owner": {
+    "name": "Danielle McCool"
+  },
+  "plugins": [
+    {
+      "name": "write-adr",
+      "description": "Create and manage Architectural Decision Records in MADR format with adg.",
+      "source": "./tools/adr-plugin",
+      "category": "development",
+      "homepage": "https://github.com/daniellemccool/ad-guidance-tool"
+    }
+  ]
+}

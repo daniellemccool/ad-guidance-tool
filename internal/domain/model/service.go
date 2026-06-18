@@ -56,6 +56,21 @@ var (
 	statusRe     = regexp.MustCompile(`^(proposed|rejected|accepted|deprecated|superseded by ADR-[0-9]{4})$`)
 	supersededRe = regexp.MustCompile(`^superseded by ADR-([0-9]{4})$`)
 	idRe         = regexp.MustCompile(`^[0-9]{4}$`)
+
+	// templatePlaceholderTokens are the literal scaffolding strings emitted by
+	// `adg add`'s canonical template. They are expected in a `proposed` stub
+	// (still being authored) but must not survive into an `accepted` record —
+	// their presence means a section was never filled in. We match the exact
+	// literals rather than a generic `{...}` regex so that prose or fenced code
+	// legitimately containing braces does not trip the check.
+	templatePlaceholderTokens = []string{
+		"{...}",
+		"{driver 1}",
+		"{option 1}",
+		"{option 2}",
+		"{option title}",
+		"{justification}",
+	}
 )
 
 // Validate runs MADR-shape and ADG-extension integrity checks across every ADR
@@ -142,6 +157,20 @@ func (s *ModelServiceImplementation) validateDecision(modelPath string, d decisi
 		} else if !slices.Contains(parsed.Options, parsed.ChosenOption) {
 			add(fmt.Sprintf("chosen option %q is not in Considered Options", parsed.ChosenOption))
 		}
+
+		// An accepted ADR is a finished record: no leftover scaffolding from
+		// `adg add`'s template, and required prose sections actually written.
+		// Proposed ADRs are work-in-progress and exempt from both checks.
+		for _, tok := range templatePlaceholderTokens {
+			if strings.Contains(body, tok) {
+				add(fmt.Sprintf("body still contains template placeholder %q; fill it in before accepting", tok))
+			}
+		}
+		// Empty Options and Outcome are already caught above (no bullets / no
+		// Chosen option); Context is the remaining required section to guard.
+		if raw, ok := parsed.Sections["context"]; ok && sectionBodyEmpty(raw) {
+			add("Context and Problem Statement section is empty")
+		}
 	}
 
 	if d.Status != "" && !statusRe.MatchString(d.Status) {
@@ -181,4 +210,12 @@ func (s *ModelServiceImplementation) validateDecision(modelPath string, d decisi
 	}
 
 	return issues
+}
+
+// sectionBodyEmpty reports whether a parsed section has no content beyond its
+// `## Header` line. Sections from ParseBody include the header line, so we drop
+// it and check whether anything but whitespace remains.
+func sectionBodyEmpty(section string) bool {
+	_, rest, _ := strings.Cut(section, "\n")
+	return strings.TrimSpace(rest) == ""
 }

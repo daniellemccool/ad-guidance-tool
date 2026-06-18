@@ -395,6 +395,223 @@ func TestReplaceBody_UsesBodyH1WhenPresent(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
+// canonicalPlaceholderBody returns a minimal MADR body whose Decision Outcome
+// section is the canonical "add"-generated placeholder. Used by Decide tests to
+// represent "the author hasn't touched Decision Outcome yet."
+func canonicalPlaceholderBody(title string) string {
+	return "# " + title + `
+
+## Context and Problem Statement
+
+ctx
+
+## Considered Options
+
+* alpha
+* beta
+
+## Decision Outcome
+
+Chosen option: "{option title}", because {justification}.
+
+### Consequences
+
+* Good, because {...}
+* Bad, because {...}
+`
+}
+
+func TestDecide_PlaceholderOutcome_Success(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	d := &Decision{ID: "0001", Status: "proposed"}
+	mockRepo.On("LoadBody", "model", "0001").Return(canonicalPlaceholderBody("Pick a thing"), nil)
+	mockRepo.On("Save", "model", mock.MatchedBy(func(saved *Decision) bool {
+		return saved.Status == "accepted" && !saved.LegacyOutcome
+	}), mock.MatchedBy(func(body string) bool {
+		return strings.Contains(body, `Chosen option: "alpha", because reasons.`)
+	})).Return(nil)
+
+	err := service.Decide("model", d, "alpha", "reasons", false)
+
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
+
+// Revise emits "{...}" as the Decision Outcome content; a subsequent Decide on
+// that revised copy must work without --force.
+func TestDecide_RevisePlaceholder_Success(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	d := &Decision{ID: "0001", Status: "proposed"}
+	body := `# T
+
+## Context and Problem Statement
+
+ctx
+
+## Considered Options
+
+* alpha
+
+## Decision Outcome
+
+{...}
+`
+	mockRepo.On("LoadBody", "model", "0001").Return(body, nil)
+	mockRepo.On("Save", "model", mock.Anything, mock.Anything).Return(nil)
+
+	err := service.Decide("model", d, "alpha", "", false)
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
+
+// An empty Decision Outcome section (just the H2 header) is still placeholder
+// — the author hasn't written anything substantive.
+func TestDecide_EmptyOutcome_Success(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	d := &Decision{ID: "0001", Status: "proposed"}
+	body := `# T
+
+## Context and Problem Statement
+
+ctx
+
+## Considered Options
+
+* alpha
+
+## Decision Outcome
+`
+	mockRepo.On("LoadBody", "model", "0001").Return(body, nil)
+	mockRepo.On("Save", "model", mock.Anything, mock.Anything).Return(nil)
+
+	err := service.Decide("model", d, "alpha", "", false)
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
+
+// Option must already be in Considered Options. Auto-create was removed per
+// spec line 277; --force does NOT bring it back.
+func TestDecide_OptionNotInList_RefusedRegardlessOfForce(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	d := &Decision{ID: "0001", Status: "proposed"}
+	mockRepo.On("LoadBody", "model", "0001").Return(canonicalPlaceholderBody("T"), nil)
+
+	for _, force := range []bool{false, true} {
+		err := service.Decide("model", d, "gamma", "", force)
+		assert.Error(t, err, "force=%v", force)
+		assert.Contains(t, err.Error(), "adg edit")
+	}
+	mockRepo.AssertNotCalled(t, "Save")
+}
+
+// THE footgun fix: a Decision Outcome with authored content (any non-placeholder
+// shape) must not be silently overwritten. Refuse without --force.
+func TestDecide_AuthoredOutcome_RefusedWithoutForce(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	d := &Decision{ID: "0001", Status: "proposed"}
+	body := `# T
+
+## Context and Problem Statement
+
+ctx
+
+## Considered Options
+
+* alpha
+
+## Decision Outcome
+
+The shutdown order is load-bearing:
+1. Cancel CancellationToken
+2. Drain JoinSet
+3. Drop WhisperEngine
+`
+	mockRepo.On("LoadBody", "model", "0001").Return(body, nil)
+
+	err := service.Decide("model", d, "alpha", "", false)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "non-placeholder")
+	assert.Contains(t, err.Error(), "--force")
+	mockRepo.AssertNotCalled(t, "Save")
+}
+
+func TestDecide_AuthoredOutcome_AllowedWithForce(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	d := &Decision{ID: "0001", Status: "proposed"}
+	body := `# T
+
+## Context and Problem Statement
+
+ctx
+
+## Considered Options
+
+* alpha
+
+## Decision Outcome
+
+Author wrote stuff here.
+`
+	mockRepo.On("LoadBody", "model", "0001").Return(body, nil)
+	mockRepo.On("Save", "model", mock.Anything, mock.MatchedBy(func(saved string) bool {
+		return strings.Contains(saved, `Chosen option: "alpha"`) &&
+			!strings.Contains(saved, "Author wrote stuff here")
+	})).Return(nil)
+
+	err := service.Decide("model", d, "alpha", "", true)
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
+
+// Customized ### Consequences bullets are authored content too — the H3 is
+// nested inside ## Decision Outcome so the parser includes it in the outcome
+// section, and replaceSection will wipe it.
+func TestDecide_AuthoredH3Consequences_RefusedWithoutForce(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	d := &Decision{ID: "0001", Status: "proposed"}
+	body := `# T
+
+## Context and Problem Statement
+
+ctx
+
+## Considered Options
+
+* alpha
+
+## Decision Outcome
+
+Chosen option: "{option title}", because {justification}.
+
+### Consequences
+
+* Real consequence the author wrote out
+* Another real consequence
+`
+	mockRepo.On("LoadBody", "model", "0001").Return(body, nil)
+
+	err := service.Decide("model", d, "alpha", "", false)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "non-placeholder")
+	mockRepo.AssertNotCalled(t, "Save")
+}
+
 func TestSupersede_HappyPath(t *testing.T) {
 	mockRepo := new(MockDecisionRepository)
 	service := NewDecisionService(mockRepo)

@@ -48,7 +48,45 @@ func TestDecide_ByTitle_Success(t *testing.T) {
 	mockOutput.AssertExpectations(t)
 }
 
-func TestDecide_AlreadyDecided(t *testing.T) {
+// AlreadyAccepted: re-deciding an accepted ADR is refused without --force.
+// Spec line 275: "Already-accepted ADRs require --force."
+func TestDecide_AlreadyAccepted_RefusedWithoutForce(t *testing.T) {
+	mockService := new(svc_mocks.DecisionService)
+	mockOutput := new(out_mocks.DecisionDecide)
+
+	d := &decision.Decision{ID: "0042", Status: "accepted"}
+
+	mockService.On("GetDecisionByID", "model", "0042").Return(d, nil)
+
+	interactor := NewDecideInteractor(mockService, mockOutput)
+	err := interactor.Decide("model", "0042", "", "Any", "", "Someone", false)
+
+	assert.ErrorContains(t, err, "already accepted")
+	assert.ErrorContains(t, err, "--force")
+	mockService.AssertExpectations(t)
+}
+
+func TestDecide_AlreadyAccepted_AllowedWithForce(t *testing.T) {
+	mockService := new(svc_mocks.DecisionService)
+	mockOutput := new(out_mocks.DecisionDecide)
+
+	d := &decision.Decision{ID: "0042", Status: "accepted"}
+
+	mockService.On("GetDecisionByID", "model", "0042").Return(d, nil)
+	mockService.On("Decide", "model", d, "Any", "", true).Return(nil)
+	mockService.On("Comment", "model", d, "Someone", "marked decision as decided").Return(nil)
+	mockOutput.On("Decided", "0042").Return(nil)
+
+	interactor := NewDecideInteractor(mockService, mockOutput)
+	err := interactor.Decide("model", "0042", "", "Any", "", "Someone", true)
+
+	assert.NoError(t, err)
+	mockService.AssertExpectations(t)
+}
+
+// LegacyDecided: same guard applies to the pre-MADR `decided` status, so
+// migrated-but-not-yet-touched ADRs are also protected.
+func TestDecide_LegacyDecided_RefusedWithoutForce(t *testing.T) {
 	mockService := new(svc_mocks.DecisionService)
 	mockOutput := new(out_mocks.DecisionDecide)
 
@@ -57,9 +95,10 @@ func TestDecide_AlreadyDecided(t *testing.T) {
 	mockService.On("GetDecisionByID", "model", "0042").Return(d, nil)
 
 	interactor := NewDecideInteractor(mockService, mockOutput)
-	err := interactor.Decide("model", "0042", "", "Any", "", "Someone", true)
+	err := interactor.Decide("model", "0042", "", "Any", "", "Someone", false)
 
-	assert.ErrorContains(t, err, "already been decided")
+	assert.ErrorContains(t, err, "already decided")
+	assert.ErrorContains(t, err, "--force")
 	mockService.AssertExpectations(t)
 }
 

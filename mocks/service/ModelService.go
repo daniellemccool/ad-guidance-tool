@@ -82,33 +82,40 @@ func (_m *ModelService) Migrate(modelPath string, dryRun bool) ([]decision.Migra
 }
 
 // Validate provides a mock function with given fields: modelPath
-func (_m *ModelService) Validate(modelPath string) ([]model.ValidationIssue, error) {
+func (_m *ModelService) Validate(modelPath string) (int, []model.ValidationIssue, error) {
 	ret := _m.Called(modelPath)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Validate")
 	}
 
-	var r0 []model.ValidationIssue
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string) ([]model.ValidationIssue, error)); ok {
+	var r0 int
+	var r1 []model.ValidationIssue
+	var r2 error
+	if rf, ok := ret.Get(0).(func(string) (int, []model.ValidationIssue, error)); ok {
 		return rf(modelPath)
 	}
-	if rf, ok := ret.Get(0).(func(string) []model.ValidationIssue); ok {
+	if rf, ok := ret.Get(0).(func(string) int); ok {
 		r0 = rf(modelPath)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]model.ValidationIssue)
+		r0 = ret.Get(0).(int)
+	}
+
+	if rf, ok := ret.Get(1).(func(string) []model.ValidationIssue); ok {
+		r1 = rf(modelPath)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).([]model.ValidationIssue)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(modelPath)
+	if rf, ok := ret.Get(2).(func(string) error); ok {
+		r2 = rf(modelPath)
 	} else {
-		r1 = ret.Error(1)
+		r2 = ret.Error(2)
 	}
 
-	return r0, r1
+	return r0, r1, r2
 }
 
 // NewModelService creates a new instance of ModelService. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

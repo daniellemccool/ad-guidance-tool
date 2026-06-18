@@ -14,7 +14,7 @@ import (
 type ModelService interface {
 	CreateModel(modelPath string) error
 	Exists(modelPath string) bool
-	Validate(modelPath string) ([]ValidationIssue, error)
+	Validate(modelPath string) (scanned int, issues []ValidationIssue, err error)
 	Migrate(modelPath string, dryRun bool) ([]decisiondomain.MigrationStep, error)
 }
 
@@ -79,10 +79,10 @@ var (
 //      existing ADR whose status references <self>.
 //   9. Comment text non-empty and not solely numeric (defends against §A.1
 //      regression).
-func (s *ModelServiceImplementation) Validate(modelPath string) ([]ValidationIssue, error) {
+func (s *ModelServiceImplementation) Validate(modelPath string) (int, []ValidationIssue, error) {
 	decisions, err := s.decisionRepo.LoadAll(modelPath)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
 	sort.Slice(decisions, func(i, j int) bool {
@@ -98,7 +98,7 @@ func (s *ModelServiceImplementation) Validate(modelPath string) ([]ValidationIss
 	for _, d := range decisions {
 		issues = append(issues, s.validateDecision(modelPath, d, byID)...)
 	}
-	return issues, nil
+	return len(decisions), issues, nil
 }
 
 func (s *ModelServiceImplementation) validateDecision(modelPath string, d decisiondomain.Decision, byID map[string]decisiondomain.Decision) []ValidationIssue {

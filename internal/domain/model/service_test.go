@@ -61,7 +61,7 @@ func TestValidate_FilenameMismatch(t *testing.T) {
 	}, nil)
 	mockDecisionRepo.On("LoadBody", "model", "abc").Return(validBody("T"), nil)
 
-	issues, err := service.Validate("model")
+	_, issues, err := service.Validate("model")
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, issues)
@@ -86,7 +86,7 @@ func TestValidate_SupersessionReverseIntegrity(t *testing.T) {
 	mockDecisionRepo.On("LoadBody", "model", "0001").Return(validBody("First"), nil)
 	mockDecisionRepo.On("LoadBody", "model", "0002").Return(validBody("Second"), nil)
 
-	issues, err := service.Validate("model")
+	_, issues, err := service.Validate("model")
 
 	assert.NoError(t, err)
 	found := false
@@ -115,7 +115,7 @@ func TestValidate_SupersessionForwardIntegrity(t *testing.T) {
 	mockDecisionRepo.On("LoadBody", "model", "0001").Return(validBody("First"), nil)
 	mockDecisionRepo.On("LoadBody", "model", "0002").Return(validBody("Second"), nil)
 
-	issues, err := service.Validate("model")
+	_, issues, err := service.Validate("model")
 
 	assert.NoError(t, err)
 	found := false
@@ -145,7 +145,7 @@ func TestValidate_PlaceholderNumericCommentText(t *testing.T) {
 	mockDecisionRepo.On("LoadAll", "model").Return(decisions, nil)
 	mockDecisionRepo.On("LoadBody", "model", "0001").Return(validBody("T"), nil)
 
-	issues, err := service.Validate("model")
+	_, issues, err := service.Validate("model")
 
 	assert.NoError(t, err)
 	found := false
@@ -169,7 +169,7 @@ func TestValidate_AllValid_NoIssues(t *testing.T) {
 	mockDecisionRepo.On("LoadAll", "model").Return(decisions, nil)
 	mockDecisionRepo.On("LoadBody", "model", "0001").Return(validBody("T"), nil)
 
-	issues, err := service.Validate("model")
+	_, issues, err := service.Validate("model")
 
 	assert.NoError(t, err)
 	assert.Empty(t, issues)
@@ -182,7 +182,7 @@ func TestValidate_PropagatesLoadError(t *testing.T) {
 
 	mockDecisionRepo.On("LoadAll", "model").Return(nil, errors.New("read error"))
 
-	_, err := service.Validate("model")
+	_, _, err := service.Validate("model")
 	assert.ErrorContains(t, err, "read error")
 }
 

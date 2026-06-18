@@ -109,9 +109,9 @@ func (_m *DecisionService) Copy(sourceModelPath string, targetPath string, decis
 	return r0
 }
 
-// Decide provides a mock function with given fields: modelPath, _a1, option, rationale, enforceOption
-func (_m *DecisionService) Decide(modelPath string, _a1 *decision.Decision, option string, rationale string, enforceOption bool) error {
-	ret := _m.Called(modelPath, _a1, option, rationale, enforceOption)
+// Decide provides a mock function with given fields: modelPath, _a1, option, rationale, force
+func (_m *DecisionService) Decide(modelPath string, _a1 *decision.Decision, option string, rationale string, force bool) error {
+	ret := _m.Called(modelPath, _a1, option, rationale, force)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Decide")
@@ -119,7 +119,7 @@ func (_m *DecisionService) Decide(modelPath string, _a1 *decision.Decision, opti
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, *decision.Decision, string, string, bool) error); ok {
-		r0 = rf(modelPath, _a1, option, rationale, enforceOption)
+		r0 = rf(modelPath, _a1, option, rationale, force)
 	} else {
 		r0 = ret.Error(0)
 	}

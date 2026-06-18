@@ -19,10 +19,11 @@ type ModelMerge interface {
 // ModelValidate receives the list of validation issues from `adg validate`.
 // The legacy interface returned two error pointers (one for index, one for
 // data) which were specific to the index-vs-files reconciliation logic that
-// has been removed. The new interface passes a flat issues list; the printer
-// is responsible for grouping per-decision and exit-code mapping.
+// has been removed. The new interface passes a flat issues list plus the
+// count of ADRs the validator scanned, so the printer can render either a
+// per-check success summary or per-decision issue reports.
 type ModelValidate interface {
-	ModelValidated(modelName string, issues []ValidationIssue)
+	ModelValidated(modelName string, scanned int, issues []ValidationIssue)
 }
 
 // ValidationIssue is the outputport mirror of model.ValidationIssue. The

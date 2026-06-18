@@ -272,9 +272,13 @@ Chosen option: "{option text}", because {rationale}.
 - **Numeric** (`--option 2`): position in the current `## Considered Options` bullet list at call time. Resolves to bullet text and writes that text.
 - **Text** (`--option "Use Postgres"`): case-insensitive match against bullet text. Errors on ambiguity.
 
-Sets `status: accepted`, touches `date`, clears `legacy-outcome` flag. Already-accepted ADRs require `--force`.
+Sets `status: accepted`, touches `date`, clears `legacy-outcome` flag.
 
-**Removed behavior:** `--force` no longer auto-creates an option. MADR principle: decisions are for previously considered options. If the option isn't in the list, errors and points at `adg edit`.
+`--force` bypasses two guards:
+- Already-accepted ADRs (re-deciding requires `--force`; `adg revise` is the cleaner path).
+- Decision Outcome sections with author-written content beyond the canonical placeholder (e.g. a hand-written shutdown order, customized `### Consequences` bullets). The whole `## Decision Outcome` section — including any nested `### Consequences` H3 — is replaced; this is the documented contract.
+
+The option must already exist in Considered Options. MADR principle: decisions are made among previously considered options. If the option isn't in the list, `decide` errors and points at `adg edit` (regardless of `--force`).
 
 ### `adg comment --id <id> --author <a> --text "..."`
 

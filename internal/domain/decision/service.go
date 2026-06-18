@@ -286,7 +286,7 @@ func (s *DecisionServiceImplementation) Decide(modelPath string, d *Decision, op
 	}
 
 	if !force && !isPlaceholderDecisionOutcome(parsed.Sections["outcome"]) {
-		return errors.New("Decision Outcome has non-placeholder content; either edit manually or invoke with --force to overwrite (this will replace any nested ### Consequences subsection as well)")
+		return errors.New("Decision Outcome already contains authored content; `decide` won't overwrite it. It only fills an outcome left as a placeholder: an empty section, `{...}`, or the unedited `adg add` template. (The literal word \"placeholder\" counts as authored content, not a sentinel.) Re-run with --force to overwrite anyway — this also replaces any nested ### Consequences subsection.")
 	}
 
 	outcome := fmt.Sprintf("## Decision Outcome\n\nChosen option: %q", chosen)

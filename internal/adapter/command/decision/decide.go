@@ -55,7 +55,7 @@ overwriting a Decision Outcome section that contains author-written content
 	cmd.Flags().StringVar(&option, "option", "", "Name or the number of the option being selected, e.g., 'first-option' or '1' (required)")
 	cmd.Flags().StringVar(&reason, "rationale", "", "Optional rationale or explanation for the selected option")
 	cmd.Flags().StringVar(&author, "author", "", "Name of the person deciding (overrides config)")
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Bypass safety guards: allow re-deciding an already-accepted ADR, and allow overwriting a Decision Outcome section that contains non-placeholder content.")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Bypass safety guards: allow re-deciding an already-accepted ADR, and allow overwriting a Decision Outcome section that contains author-written content (anything other than an empty section, `{...}`, or the unedited `adg add` template).")
 
 	return cmd
 }

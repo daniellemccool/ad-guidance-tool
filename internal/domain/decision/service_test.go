@@ -541,7 +541,40 @@ The shutdown order is load-bearing:
 	err := service.Decide("model", d, "alpha", "", false)
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "non-placeholder")
+	assert.Contains(t, err.Error(), "authored content")
+	assert.Contains(t, err.Error(), "--force")
+	mockRepo.AssertNotCalled(t, "Save")
+}
+
+// The literal word "placeholder" in the Decision Outcome is author text, not a
+// recognized sentinel — this is the exact ADR 0032 footgun. The guard must
+// refuse, and the error must name the gotcha so an agent self-rescues without
+// dropping to bare `adg`.
+func TestDecide_LiteralPlaceholderWord_TreatedAsAuthored(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	d := &Decision{ID: "0001", Status: "proposed"}
+	body := `# T
+
+## Context and Problem Statement
+
+ctx
+
+## Considered Options
+
+* alpha
+
+## Decision Outcome
+
+placeholder
+`
+	mockRepo.On("LoadBody", "model", "0001").Return(body, nil)
+
+	err := service.Decide("model", d, "alpha", "", false)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), `"placeholder"`)
 	assert.Contains(t, err.Error(), "--force")
 	mockRepo.AssertNotCalled(t, "Save")
 }
@@ -608,7 +641,7 @@ Chosen option: "{option title}", because {justification}.
 	err := service.Decide("model", d, "alpha", "", false)
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "non-placeholder")
+	assert.Contains(t, err.Error(), "Consequences")
 	mockRepo.AssertNotCalled(t, "Save")
 }
 

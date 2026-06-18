@@ -175,6 +175,144 @@ func TestValidate_AllValid_NoIssues(t *testing.T) {
 	assert.Empty(t, issues)
 }
 
+// completeAcceptedBody is a finished record: real Context, real options, and a
+// tool-generated Chosen option line — no surviving template scaffolding.
+func completeAcceptedBody() string {
+	return `# T
+
+## Context and Problem Statement
+
+Real, written context.
+
+## Considered Options
+
+* Option A
+* Option B
+
+## Decision Outcome
+
+Chosen option: "Option A", because it is the simplest.
+`
+}
+
+// TestValidate_AcceptedCompleteBody_NoIssues anchors the happy path for the
+// finished-record checks: a fully-written accepted ADR produces zero issues.
+func TestValidate_AcceptedCompleteBody_NoIssues(t *testing.T) {
+	mockModelRepo := new(MockModelRepository)
+	mockDecisionRepo := new(decision.MockDecisionRepository)
+	service := NewModelService(mockModelRepo, mockDecisionRepo)
+
+	mockDecisionRepo.On("LoadAll", "model").Return([]decision.Decision{
+		{ID: "0001", Title: "T", Status: "accepted"},
+	}, nil)
+	mockDecisionRepo.On("LoadBody", "model", "0001").Return(completeAcceptedBody(), nil)
+
+	_, issues, err := service.Validate("model")
+
+	assert.NoError(t, err)
+	assert.Empty(t, issues)
+}
+
+// TestValidate_AcceptedSurvivingTemplateToken flags scaffolding left in an
+// accepted ADR — the section was never filled in.
+func TestValidate_AcceptedSurvivingTemplateToken(t *testing.T) {
+	mockModelRepo := new(MockModelRepository)
+	mockDecisionRepo := new(decision.MockDecisionRepository)
+	service := NewModelService(mockModelRepo, mockDecisionRepo)
+
+	// Context still holds the `{...}` token; options/outcome are complete so
+	// the token rule is isolated.
+	body := `# T
+
+## Context and Problem Statement
+
+{...}
+
+## Considered Options
+
+* Option A
+* Option B
+
+## Decision Outcome
+
+Chosen option: "Option A", because reasons.
+`
+	mockDecisionRepo.On("LoadAll", "model").Return([]decision.Decision{
+		{ID: "0001", Title: "T", Status: "accepted"},
+	}, nil)
+	mockDecisionRepo.On("LoadBody", "model", "0001").Return(body, nil)
+
+	_, issues, err := service.Validate("model")
+
+	assert.NoError(t, err)
+	found := false
+	for _, iss := range issues {
+		if iss.ID == "0001" && containsAll(iss.Message, "template placeholder", "{...}") {
+			found = true
+		}
+	}
+	assert.True(t, found, "expected surviving-template-token issue, got: %#v", issues)
+}
+
+// TestValidate_AcceptedEmptyContext flags an accepted ADR whose required
+// Context section has a header but no prose.
+func TestValidate_AcceptedEmptyContext(t *testing.T) {
+	mockModelRepo := new(MockModelRepository)
+	mockDecisionRepo := new(decision.MockDecisionRepository)
+	service := NewModelService(mockModelRepo, mockDecisionRepo)
+
+	body := `# T
+
+## Context and Problem Statement
+
+## Considered Options
+
+* Option A
+* Option B
+
+## Decision Outcome
+
+Chosen option: "Option A", because reasons.
+`
+	mockDecisionRepo.On("LoadAll", "model").Return([]decision.Decision{
+		{ID: "0001", Title: "T", Status: "accepted"},
+	}, nil)
+	mockDecisionRepo.On("LoadBody", "model", "0001").Return(body, nil)
+
+	_, issues, err := service.Validate("model")
+
+	assert.NoError(t, err)
+	found := false
+	for _, iss := range issues {
+		if iss.ID == "0001" && containsAll(iss.Message, "Context", "empty") {
+			found = true
+		}
+	}
+	assert.True(t, found, "expected empty-Context issue, got: %#v", issues)
+}
+
+// TestValidate_ProposedWithTemplateToken_Exempt confirms a proposed stub may
+// still carry template scaffolding without being flagged — it's in progress.
+func TestValidate_ProposedWithTemplateToken_Exempt(t *testing.T) {
+	mockModelRepo := new(MockModelRepository)
+	mockDecisionRepo := new(decision.MockDecisionRepository)
+	service := NewModelService(mockModelRepo, mockDecisionRepo)
+
+	// validBody carries `{...}` in Decision Outcome; status is proposed.
+	mockDecisionRepo.On("LoadAll", "model").Return([]decision.Decision{
+		{ID: "0001", Title: "T", Status: "proposed"},
+	}, nil)
+	mockDecisionRepo.On("LoadBody", "model", "0001").Return(validBody("T"), nil)
+
+	_, issues, err := service.Validate("model")
+
+	assert.NoError(t, err)
+	for _, iss := range issues {
+		assert.NotContains(t, iss.Message, "template placeholder",
+			"proposed ADRs must be exempt from the token check")
+	}
+}
+
 func TestValidate_PropagatesLoadError(t *testing.T) {
 	mockModelRepo := new(MockModelRepository)
 	mockDecisionRepo := new(decision.MockDecisionRepository)

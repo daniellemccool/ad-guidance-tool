@@ -29,6 +29,8 @@ var validateChecks = []string{
 	"required sections present (Context, Considered Options, Decision Outcome)",
 	"Considered Options bullets present",
 	"accepted ADRs have a valid Chosen option",
+	"accepted ADRs free of leftover template placeholders",
+	"accepted ADRs have non-empty required sections",
 	"status vocabulary",
 	"supersession links (forward + reverse integrity)",
 	"comments well-formed (non-empty, non-numeric placeholder)",

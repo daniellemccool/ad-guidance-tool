@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# pre-commit — fail-fast on `adg validate`. ADR consistency is enforced at
+# commit time; `adg validate` exits non-zero on any issue, aborting the commit.
+# Install: cp this to .githooks/pre-commit && git config core.hooksPath .githooks
+# Model defaults to docs/decisions; override with ADR_MODEL.
+set -e
+MODEL="${ADR_MODEL:-docs/decisions}"
+if [[ -d "$MODEL" ]]; then
+    adg validate --model "$MODEL"
+fi

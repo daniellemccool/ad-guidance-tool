@@ -257,6 +257,35 @@ func TestFileRepo_LoadAll_RefusesLegacyADGFile(t *testing.T) {
 	}
 }
 
+// A tree of subfolders each holding legacy files is several sub-models collided
+// into one directory. LoadAll must enumerate every offending file (not bail on
+// the first) and name the multiple-sub-model case.
+func TestFileRepo_LoadAll_LegacyTreeReportsAllAndSubModels(t *testing.T) {
+	repo, modelDir := newRepoIn(t)
+
+	for _, sub := range []string{"alpha", "beta"} {
+		dir := filepath.Join(modelDir, sub)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("MkdirAll errored: %v", err)
+		}
+		// Filename pattern `AD\d{4}-.*\.md` trips IsLegacyADG by filename alone.
+		if err := os.WriteFile(filepath.Join(dir, "AD0001-legacy.md"), []byte("# x\n"), 0o644); err != nil {
+			t.Fatalf("WriteFile errored: %v", err)
+		}
+	}
+
+	_, err := repo.LoadAll(modelDir)
+	if err == nil {
+		t.Fatal("expected LoadAll to error on legacy tree")
+	}
+	msg := err.Error()
+	for _, want := range []string{"alpha", "beta", "multiple sub-models", "adg migrate"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error should mention %q; got: %v", want, msg)
+		}
+	}
+}
+
 func TestFileRepo_LoadAll_SkipsUnrelatedMarkdown(t *testing.T) {
 	repo, modelDir := newRepoIn(t)
 

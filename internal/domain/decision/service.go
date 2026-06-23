@@ -265,11 +265,11 @@ func (s *DecisionServiceImplementation) FilterDecisions(decisions []Decision, fi
 // previously considered alternatives; use `adg edit` to add a new option
 // before deciding.
 //
-// Decide refuses to overwrite a Decision Outcome that contains anything
-// beyond the canonical placeholder (i.e. content the author wrote), unless
-// force is true. This guard exists because `replaceSection` wipes the entire
-// `## Decision Outcome` block including any nested `### Consequences` H3,
-// so an author-curated body would be silently destroyed otherwise.
+// Decide rewrites only the outcome prose above any nested `### Consequences`
+// (or other H3) subsection, which it preserves verbatim — load-bearing detail
+// authored under Decision Outcome survives the decision, as documented in the
+// form factor. It refuses to overwrite an outcome line the author has already
+// written (anything beyond the canonical placeholder) unless force is true.
 func (s *DecisionServiceImplementation) Decide(modelPath string, d *Decision, option, rationale string, force bool) error {
 	body, err := s.repo.LoadBody(modelPath, d.ID)
 	if err != nil {
@@ -286,14 +286,21 @@ func (s *DecisionServiceImplementation) Decide(modelPath string, d *Decision, op
 	}
 
 	if !force && !isPlaceholderDecisionOutcome(parsed.Sections["outcome"]) {
-		return errors.New("Decision Outcome already contains authored content; `decide` won't overwrite it. It only fills an outcome left as a placeholder: an empty section, `{...}`, or the unedited `adg add` template. (The literal word \"placeholder\" counts as authored content, not a sentinel.) Re-run with --force to overwrite anyway — this also replaces any nested ### Consequences subsection.")
+		return errors.New("Decision Outcome already contains authored content; `decide` won't overwrite it. It only fills an outcome left as a placeholder: an empty outcome, `{...}`, or the unedited `adg add` template line. (The literal word \"placeholder\" counts as authored content, not a sentinel.) Any nested ### Consequences subsection is preserved either way. Re-run with --force to overwrite the authored outcome line.")
 	}
+
+	// Preserve any nested ### subsection (e.g. ### Consequences) verbatim;
+	// decide only rewrites the outcome prose above it.
+	_, consequences := splitOutcomeBody(parsed.Sections["outcome"])
 
 	outcome := fmt.Sprintf("## Decision Outcome\n\nChosen option: %q", chosen)
 	if rationale != "" {
 		outcome += fmt.Sprintf(", because %s", rationale)
 	}
 	outcome += ".\n"
+	if consequences != "" {
+		outcome += "\n" + strings.TrimRight(consequences, "\n") + "\n"
+	}
 	body = replaceSection(body, "Decision Outcome", outcome)
 
 	d.Status = "accepted"
@@ -303,29 +310,24 @@ func (s *DecisionServiceImplementation) Decide(modelPath string, d *Decision, op
 }
 
 // placeholderOutcomeContents is the set of "the author hasn't written here yet"
-// shapes for the Decision Outcome section body (everything after the `## Decision
-// Outcome` header line). Anything else is considered authored content that Decide
-// must not destroy without --force.
+// shapes for the Decision Outcome prose — the lines between the `## Decision
+// Outcome` header and the first nested `###` subsection. Anything else is
+// authored content that Decide must not overwrite without --force.
 //
-//   - "" matches an empty section (just the header, no content).
+//   - "" matches an empty section (just the header, no prose).
 //   - "{...}" matches what Revise writes when creating a fresh copy.
-//   - The canonicalTemplate-derived shape matches what `adg add` writes for a
-//     brand-new ADR; the nested `### Consequences` H3 is part of the placeholder
-//     because the parser includes it in Sections["outcome"] (it's H3, not H2).
+//   - The canonical `adg add` outcome line is a placeholder until the author
+//     fills in the option title and justification. Any nested `### Consequences`
+//     is preserved independently and so does not factor into this check.
 var placeholderOutcomeContents = []string{
 	"",
 	"{...}",
-	`Chosen option: "{option title}", because {justification}.
-
-### Consequences
-
-* Good, because {...}
-* Bad, because {...}`,
+	`Chosen option: "{option title}", because {justification}.`,
 }
 
 func isPlaceholderDecisionOutcome(outcomeSection string) bool {
-	content := stripH2Header(outcomeSection)
-	norm := normalizeBlankLines(strings.TrimSpace(content))
+	prose, _ := splitOutcomeBody(outcomeSection)
+	norm := normalizeBlankLines(strings.TrimSpace(prose))
 	for _, p := range placeholderOutcomeContents {
 		if norm == normalizeBlankLines(strings.TrimSpace(p)) {
 			return true
@@ -334,12 +336,23 @@ func isPlaceholderDecisionOutcome(outcomeSection string) bool {
 	return false
 }
 
-func stripH2Header(section string) string {
-	lines := strings.Split(section, "\n")
+// splitOutcomeBody splits a `## Decision Outcome` section into the outcome prose
+// (everything between the H2 header and the first nested `###` subsection) and
+// the subsection tail (the first `### ` line and everything after it). `decide`
+// rewrites only the prose; the tail — e.g. a `### Consequences` carrying
+// load-bearing detail — is preserved verbatim.
+func splitOutcomeBody(outcomeSection string) (prose, tail string) {
+	lines := strings.Split(outcomeSection, "\n")
+	start := 0
 	if len(lines) > 0 && strings.HasPrefix(strings.TrimSpace(lines[0]), "## ") {
-		lines = lines[1:]
+		start = 1
 	}
-	return strings.Join(lines, "\n")
+	for i := start; i < len(lines); i++ {
+		if strings.HasPrefix(strings.TrimSpace(lines[i]), "### ") {
+			return strings.Join(lines[start:i], "\n"), strings.Join(lines[i:], "\n")
+		}
+	}
+	return strings.Join(lines[start:], "\n"), ""
 }
 
 var multiBlankRe = regexp.MustCompile(`\n[ \t]*\n[ \t\n]*`)

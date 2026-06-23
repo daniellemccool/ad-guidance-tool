@@ -609,10 +609,12 @@ Author wrote stuff here.
 	mockRepo.AssertExpectations(t)
 }
 
-// Customized ### Consequences bullets are authored content too — the H3 is
-// nested inside ## Decision Outcome so the parser includes it in the outcome
-// section, and replaceSection will wipe it.
-func TestDecide_AuthoredH3Consequences_RefusedWithoutForce(t *testing.T) {
+// The documented workflow: pre-author ### Consequences, leave the outcome line
+// as the template placeholder, and let `decide` fill the outcome line. Because
+// ### Consequences is nested under ## Decision Outcome, decide rewrites only the
+// outcome prose above it and preserves the authored Consequences verbatim — no
+// --force required.
+func TestDecide_AuthoredH3Consequences_PreservedAndOutcomeFilled(t *testing.T) {
 	mockRepo := new(MockDecisionRepository)
 	service := NewDecisionService(mockRepo)
 
@@ -637,12 +639,56 @@ Chosen option: "{option title}", because {justification}.
 * Another real consequence
 `
 	mockRepo.On("LoadBody", "model", "0001").Return(body, nil)
+	mockRepo.On("Save", "model", mock.MatchedBy(func(saved *Decision) bool {
+		return saved.Status == "accepted"
+	}), mock.MatchedBy(func(saved string) bool {
+		return strings.Contains(saved, `Chosen option: "alpha"`) &&
+			strings.Contains(saved, "Real consequence the author wrote out") &&
+			strings.Contains(saved, "Another real consequence") &&
+			!strings.Contains(saved, "{option title}")
+	})).Return(nil)
 
 	err := service.Decide("model", d, "alpha", "", false)
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Consequences")
-	mockRepo.AssertNotCalled(t, "Save")
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
+
+// Even with --force overwriting an authored outcome line, a nested ###
+// Consequences subsection is preserved — decide never wipes Consequences.
+func TestDecide_ForceOverwritesOutcomeButPreservesConsequences(t *testing.T) {
+	mockRepo := new(MockDecisionRepository)
+	service := NewDecisionService(mockRepo)
+
+	d := &Decision{ID: "0001", Status: "proposed"}
+	body := `# T
+
+## Context and Problem Statement
+
+ctx
+
+## Considered Options
+
+* alpha
+
+## Decision Outcome
+
+Author wrote a real outcome here.
+
+### Consequences
+
+* Load-bearing consequence
+`
+	mockRepo.On("LoadBody", "model", "0001").Return(body, nil)
+	mockRepo.On("Save", "model", mock.Anything, mock.MatchedBy(func(saved string) bool {
+		return strings.Contains(saved, `Chosen option: "alpha"`) &&
+			!strings.Contains(saved, "Author wrote a real outcome here") &&
+			strings.Contains(saved, "Load-bearing consequence")
+	})).Return(nil)
+
+	err := service.Decide("model", d, "alpha", "", true)
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
 }
 
 func TestSupersede_HappyPath(t *testing.T) {

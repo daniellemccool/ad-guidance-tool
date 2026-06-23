@@ -3,12 +3,14 @@ package decision
 import (
 	domain "adg/internal/domain/decision"
 	"adg/internal/domain/decision/madr"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -150,6 +152,7 @@ func (r *FileDecisionRepository) LoadByTitle(modelPath, title string) (*domain.D
 
 func (r *FileDecisionRepository) LoadAll(modelPath string) ([]domain.Decision, error) {
 	var decisions []domain.Decision
+	var legacy []string
 	err := filepath.WalkDir(modelPath, func(path string, e fs.DirEntry, err error) error {
 		if err != nil || e.IsDir() {
 			return err
@@ -161,8 +164,12 @@ func (r *FileDecisionRepository) LoadAll(modelPath string) ([]domain.Decision, e
 		if readErr != nil {
 			return readErr
 		}
+		// Collect legacy files rather than bailing on the first one, so the
+		// final error can enumerate every file that needs migrating and reveal
+		// when the tree is actually several sub-models (see legacyFilesError).
 		if madr.IsLegacyADG(path, content) {
-			return fmt.Errorf("file %s appears to use legacy ADG format; run 'adg migrate --model %s' to convert", path, modelPath)
+			legacy = append(legacy, path)
+			return nil
 		}
 		// Skip unrelated markdown (e.g. README.md) whose filename doesn't match NNNN-slug.md
 		if _, _, perr := madr.ParseFilename(path); perr != nil {
@@ -178,7 +185,55 @@ func (r *FileDecisionRepository) LoadAll(modelPath string) ([]domain.Decision, e
 	if err != nil {
 		return nil, err
 	}
+	if len(legacy) > 0 {
+		return nil, legacyFilesError(modelPath, legacy)
+	}
 	return decisions, nil
+}
+
+// legacyFilesError summarizes every legacy ADG file found under modelPath,
+// grouped by the subdirectory that contains it. A tree with more than one such
+// subdirectory is almost always several colliding sub-models that were migrated
+// from an older tool into one directory, so the message names that case
+// explicitly — adg treats --model as a single flat model and can't validate a
+// tree of sub-models at once.
+func legacyFilesError(modelPath string, legacy []string) error {
+	byDir := map[string][]string{}
+	var order []string
+	for _, p := range legacy {
+		rel, relErr := filepath.Rel(modelPath, p)
+		if relErr != nil {
+			rel = p
+		}
+		dir := filepath.Dir(rel)
+		if _, seen := byDir[dir]; !seen {
+			order = append(order, dir)
+		}
+		byDir[dir] = append(byDir[dir], filepath.Base(rel))
+	}
+	sort.Strings(order)
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d file(s) under %s use the legacy ADG format and must be converted before they can be read:\n", len(legacy), modelPath)
+	subdirs := 0
+	for _, dir := range order {
+		label := dir
+		if dir == "." {
+			label = "(model root)"
+		} else {
+			subdirs++
+		}
+		files := byDir[dir]
+		sort.Strings(files)
+		fmt.Fprintf(&b, "  %s: %s\n", label, strings.Join(files, ", "))
+	}
+
+	if subdirs > 1 {
+		fmt.Fprintf(&b, "\nThis looks like multiple sub-models collected under %s. adg treats --model as a single flat model and cannot validate or list a tree of sub-models at once; run 'adg migrate --model <subfolder>' on each subfolder individually.", modelPath)
+	} else {
+		fmt.Fprintf(&b, "\nRun 'adg migrate --model %s' to convert them.", modelPath)
+	}
+	return errors.New(b.String())
 }
 
 func (r *FileDecisionRepository) LoadBody(modelPath, id string) (string, error) {
@@ -402,4 +457,3 @@ func (r *FileDecisionRepository) generateNextID(modelPath string) (string, error
 	}
 	return fmt.Sprintf("%04d", maxID+1), nil
 }
-

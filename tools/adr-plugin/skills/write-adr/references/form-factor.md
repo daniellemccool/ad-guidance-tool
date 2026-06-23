@@ -23,8 +23,9 @@ is genuinely close and the reasoning needs to be preserved.
 
 If a decision carries operational detail that must survive (an ordering constraint, a
 formula, a default value), put it in `### Consequences` under the outcome — **not** loose in
-Decision Outcome. `adg decide` rewrites the outcome line; content in `### Consequences`
-survives, and the guard refuses to clobber it without `--force`.
+Decision Outcome. `adg decide` rewrites only the outcome line above `### Consequences`;
+content in `### Consequences` is preserved verbatim (with or without `--force`). The guard
+refuses to overwrite an outcome line you've already authored unless you pass `--force`.
 
 ## What the validator enforces (and what it leaves to you)
 

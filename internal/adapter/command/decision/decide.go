@@ -21,9 +21,13 @@ func NewDecideCommand(input inputport.DecisionDecide, config domain.ConfigServic
 and marking the decision as accepted. The option must already exist in the decision's
 Considered Options list — use 'adg edit --option' first if you need to add a new one.
 
+Decide rewrites only the outcome line above any nested ### Consequences
+subsection, which it preserves verbatim — so you can pre-author Consequences
+and let decide fill the outcome.
+
 --force bypasses two safety guards: re-deciding an already-accepted ADR, and
-overwriting a Decision Outcome section that contains author-written content
-(non-placeholder text, including any nested ### Consequences subsection).`,
+overwriting an outcome line the author has already written (non-placeholder
+text). A nested ### Consequences subsection is preserved with or without --force.`,
 		// Errors describe model state (already-accepted, authored outcome,
 		// unknown option) rather than CLI misuse, so don't dump Usage on failure.
 		SilenceUsage: true,
@@ -55,7 +59,7 @@ overwriting a Decision Outcome section that contains author-written content
 	cmd.Flags().StringVar(&option, "option", "", "Name or the number of the option being selected, e.g., 'first-option' or '1' (required)")
 	cmd.Flags().StringVar(&reason, "rationale", "", "Optional rationale or explanation for the selected option")
 	cmd.Flags().StringVar(&author, "author", "", "Name of the person deciding (overrides config)")
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Bypass safety guards: allow re-deciding an already-accepted ADR, and allow overwriting a Decision Outcome section that contains author-written content (anything other than an empty section, `{...}`, or the unedited `adg add` template).")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Bypass safety guards: allow re-deciding an already-accepted ADR, and allow overwriting an authored outcome line (anything other than an empty outcome, `{...}`, or the unedited `adg add` template line). A nested ### Consequences subsection is preserved regardless.")
 
 	return cmd
 }

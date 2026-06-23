@@ -57,11 +57,26 @@ func TestResolveIdOrTitle_EmptyInput(t *testing.T) {
 	assert.Contains(t, err.Error(), "you must specify the decisions via --id")
 }
 
+func TestResolveIdOrTitle_ShortIDZeroPadded(t *testing.T) {
+	var id, title string
+	err := ResolveIdOrTitle("1", &id, &title)
+	assert.NoError(t, err)
+	assert.Equal(t, "0001", id)
+	assert.Empty(t, title)
+}
+
+func TestResolveIdOrTitle_OutOfRangeID(t *testing.T) {
+	var id, title string
+	err := ResolveIdOrTitle("0", &id, &title)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "range 1-9999")
+}
+
 func TestResolveIdOrTitle_InvalidFormat(t *testing.T) {
 	var id, title string
 	err := ResolveIdOrTitle("####", &id, &title)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "input must be either a 4-digit ID")
+	assert.Contains(t, err.Error(), "input must be either an ID")
 }
 
 func TestGetTemplateSections_Nygard(t *testing.T) {

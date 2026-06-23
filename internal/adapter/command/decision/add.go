@@ -5,7 +5,6 @@ import (
 	"adg/internal/application/inputport"
 	domain "adg/internal/domain/config"
 	"fmt"
-	"strconv"
 
 	"github.com/spf13/cobra"
 )
@@ -36,7 +35,7 @@ func NewAddCommand(input inputport.DecisionAdd, config domain.ConfigService) *co
 				if len(titles) != 1 {
 					return fmt.Errorf("--id can only be used with a single --title (got %d titles)", len(titles))
 				}
-				normalizedID, err = normalizeID(id)
+				normalizedID, err = util.NormalizeID(id)
 				if err != nil {
 					return err
 				}
@@ -55,17 +54,4 @@ func NewAddCommand(input inputport.DecisionAdd, config domain.ConfigService) *co
 	cmd.Flags().StringVar(&id, "id", "", "Optional explicit ID (1-9999, zero-padded to 4 digits). Fails if the ID is already taken.")
 
 	return cmd
-}
-
-// normalizeID accepts "22" or "0022" and returns "0022". Rejects values outside
-// 1..9999 and non-numeric input. 0000 is reserved.
-func normalizeID(input string) (string, error) {
-	n, err := strconv.Atoi(input)
-	if err != nil {
-		return "", fmt.Errorf("invalid --id %q: must be a number 1-9999", input)
-	}
-	if n < 1 || n > 9999 {
-		return "", fmt.Errorf("invalid --id %q: must be in range 1-9999", input)
-	}
-	return fmt.Sprintf("%04d", n), nil
 }

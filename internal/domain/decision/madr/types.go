@@ -28,6 +28,18 @@ type Decision struct {
 	Supersedes    []string
 	Comments      []Comment
 	LegacyOutcome bool
+
+	// Lean-format extensions (see internal/domain/decision/lean). Source records
+	// where the decision was deliberated (provenance); Category groups the ADR in
+	// the generated index; Amends records the ADRs this one amends (the
+	// machine-checkable counterpart to a prose "Amended by" note). AppliesTo holds
+	// glob patterns (repo-root-relative) that route this ADR to changed files, and
+	// Priority ("invariant" | "default") sets its force in a compiled brief.
+	Source    string
+	Category  string
+	Amends    []string
+	AppliesTo []string
+	Priority  string
 }
 
 // Comment is one entry in the ADG-extension `comments` frontmatter list.
@@ -53,6 +65,11 @@ type Frontmatter struct {
 	Supersedes     []string            `yaml:"supersedes,omitempty"`
 	Comments       []Comment           `yaml:"comments,omitempty"`
 	LegacyOutcome  bool                `yaml:"legacy-outcome,omitempty"`
+	Source         string              `yaml:"source,omitempty"`
+	Category       string              `yaml:"category,omitempty"`
+	Amends         []string            `yaml:"amends,omitempty"`
+	AppliesTo      []string            `yaml:"applies_to,omitempty"`
+	Priority       string              `yaml:"priority,omitempty"`
 }
 
 func (d Decision) Frontmatter() Frontmatter {
@@ -67,6 +84,11 @@ func (d Decision) Frontmatter() Frontmatter {
 		Supersedes:     d.Supersedes,
 		Comments:       d.Comments,
 		LegacyOutcome:  d.LegacyOutcome,
+		Source:         d.Source,
+		Category:       d.Category,
+		Amends:         d.Amends,
+		AppliesTo:      d.AppliesTo,
+		Priority:       d.Priority,
 	}
 }
 
@@ -82,5 +104,10 @@ func DecisionFromFrontmatter(fm Frontmatter) Decision {
 		Supersedes:     fm.Supersedes,
 		Comments:       fm.Comments,
 		LegacyOutcome:  fm.LegacyOutcome,
+		Source:         fm.Source,
+		Category:       fm.Category,
+		Amends:         fm.Amends,
+		AppliesTo:      fm.AppliesTo,
+		Priority:       fm.Priority,
 	}
 }

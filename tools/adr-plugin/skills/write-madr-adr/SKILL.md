@@ -1,23 +1,31 @@
 ---
-name: write-adr
+name: write-madr-adr
 description: >
-  Create and manage Architectural Decision Records (ADRs) in MADR format using the
-  `adg` CLI. Use whenever you record, document, or revise an architectural decision,
-  capture a design choice or a rejected alternative, or are asked "should this be an
-  ADR". Also use proactively after implementing a significant architectural pattern
-  that isn't yet recorded. Works in any repo with a `docs/decisions/` model (and
-  bootstraps one if absent).
+  Create and manage durable Architectural Decision Records (ADRs) in MADR format
+  using the `adg` CLI — full sections (Context and Problem Statement, Considered
+  Options, Decision Outcome) and the decide / supersede / revise lifecycle. Use in
+  repos whose ADRs follow the MADR shape, whenever you record, document, or revise an
+  architectural decision, capture a design choice or a rejected alternative, or are
+  asked "should this be an ADR"; also proactively after implementing a significant
+  pattern that isn't yet recorded. For lean Decision/Guidance records with routing
+  frontmatter (applies_to / excludes / forbids / companions), use the write-lean-adr
+  skill instead. Works in any repo with a `docs/decisions/` model (and bootstraps one
+  if absent).
 ---
 
-# write-adr — record an architectural decision with `adg`
+# write-madr-adr — record a durable decision in MADR format with `adg`
 
 ADRs are MADR-format markdown managed by the `adg` CLI. Three rules carry the whole skill:
 
 1. **Drive everything through `adg`. Never hand-edit ADR files.** The tool enforces the
    shape, round-trips the body, and regenerates the `## Comments` section from frontmatter
    — hand-edits are lost or rejected.
-2. **One flat model: `docs/decisions/`.** Files are `NNNN-slug.md` with bare 4-digit IDs.
-   No per-domain sub-models — a single chronological sequence per repo.
+2. **One flat *active* model: `docs/decisions/`** (unless `adg set-config` points elsewhere).
+   Files are `NNNN-slug.md` with bare 4-digit IDs; one chronological sequence per repo, no
+   per-domain sub-models. Operate only on that active model — other ADR-like files in the tree (a
+   historical record under `docs/fork-design/`, a lean model, seed/template models) are **not** your
+   model; don't scan every `NNNN-*.md` in the repo. Pick this skill vs write-lean-adr by the active
+   model's format (full MADR sections here; Decision/Guidance + routing frontmatter for lean).
 3. **Keep ADRs small.** See `references/form-factor.md`. The validator enforces the floor
    (no scaffolding, no empty sections); you hold the ceiling — don't pad.
 
@@ -31,9 +39,11 @@ wrapper removes the boilerplate — see "Optional ergonomics".
 # Bootstrap the model if docs/decisions/ doesn't exist yet:
 adg init docs/decisions
 
-# Install the enforcement hook so `adg validate` gates every commit.
-# (Copy from this skill's assets/githooks/pre-commit.)
-mkdir -p .githooks && cp assets/githooks/pre-commit .githooks/pre-commit
+# Install the enforcement hook so `adg validate` gates every commit. Copy this skill's
+# assets/githooks/pre-commit into the repo — substitute this skill's actual install
+# directory for <skill-dir> (the asset path is not relative to the target repo):
+mkdir -p .githooks
+cp <skill-dir>/assets/githooks/pre-commit .githooks/pre-commit
 chmod +x .githooks/pre-commit
 git config core.hooksPath .githooks
 ```

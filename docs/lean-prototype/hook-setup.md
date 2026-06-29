@@ -12,7 +12,7 @@ nothing and the edit proceeds.
 go install .            # or: go build -o ~/.local/bin/adg .
 ```
 
-`adg brief --hook` is the hook entry point (no separate binary needed).
+`adg lean brief --hook` is the hook entry point (no separate binary needed).
 
 ## 2. Register the hook
 
@@ -28,7 +28,7 @@ directory:
         "hooks": [
           {
             "type": "command",
-            "command": "adg brief --hook --model docs/decisions",
+            "command": "adg lean brief --hook --model docs/decisions",
             "timeout": 30
           }
         ]
@@ -50,7 +50,7 @@ session, feed it the same JSON Claude Code sends:
 
 ```
 printf '{"cwd":"%s","tool_name":"Edit","tool_input":{"file_path":"%s/port/helpers/flow_builder.py"}}' "$PWD" "$PWD" \
-  | adg brief --hook --model docs/lean-prototype
+  | adg lean brief --hook --model docs/lean-prototype
 ```
 
 A governed file prints a `hookSpecificOutput.additionalContext` JSON object; an ungoverned file
@@ -58,10 +58,17 @@ prints nothing.
 
 ## Notes
 
+- **Advisory routing, not comprehensive enforcement.** This hook fires only on Claude's
+  `Edit`/`Write`/`MultiEdit`. It will **not** catch shell edits, formatters, generated rewrites, manual
+  human edits, or other agents/tools, and it is fail-open — so **"no brief appeared" never means "no rule
+  applies."** Use `adg lean index --root` in CI, code review, or executable checks for actual enforcement.
 - **Token cost** is the point: only matching ADRs are injected. An edit to an ungoverned file costs
   zero tokens. A file under a broad invariant plus a couple of path-scoped defaults is ~30–40 lines.
-- **Prereq:** the repo's ADRs must be in the lean format with `applies_to` (and `priority`)
-  frontmatter. Until a repo's records are migrated/annotated, the hook simply no-ops there.
+- **Prereq:** the repo's ADRs must be in the lean format with routing frontmatter — `applies_to`
+  (and optionally `excludes` / `forbids` / `companions` and `priority`). The hook routes on
+  `applies_to` and `forbids` (an edit to a forbidden path injects the rule as a violation) and honors
+  `excludes`; until a repo's records are migrated/annotated it simply no-ops there. See the lean-format
+  reference (`tools/adr-plugin/skills/write-lean-adr/references/lean-format.md`) for the full schema.
 - **Contract:** `PreToolUse` + exit 0 + `{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"…"}}`
   injects to the model without blocking the edit. The logic lives in `lean.HookContext`
-  (`internal/domain/decision/lean/hook.go`); `adg brief --hook` is a thin stdin/stdout shell.
+  (`internal/domain/decision/lean/hook.go`); `adg lean brief --hook` is a thin stdin/stdout shell.

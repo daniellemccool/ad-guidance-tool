@@ -35,6 +35,34 @@ func TestFrontmatter_LegacyOutcome_Omitempty(t *testing.T) {
 	assert.NotContains(t, string(out), "legacy-outcome")
 }
 
+func TestFrontmatter_LeanScopeFields_Roundtrip(t *testing.T) {
+	fm := Frontmatter{
+		Status:     "accepted",
+		AppliesTo:  []string{"port/**/*.py"},
+		Excludes:   []string{"port/helpers/port_helpers.py"},
+		Forbids:    []string{"port/extraction/**/*.py"},
+		Companions: []string{"packages/data-collector/src/App.tsx"},
+	}
+	out, err := yaml.Marshal(fm)
+	assert.NoError(t, err)
+	assert.Contains(t, string(out), "excludes:")
+	assert.Contains(t, string(out), "forbids:")
+	assert.Contains(t, string(out), "companions:")
+
+	var got Frontmatter
+	assert.NoError(t, yaml.Unmarshal(out, &got))
+	assert.Equal(t, fm, got)
+}
+
+func TestFrontmatter_LeanScopeFields_Omitempty(t *testing.T) {
+	fm := Frontmatter{Status: "proposed"}
+	out, err := yaml.Marshal(fm)
+	assert.NoError(t, err)
+	for _, key := range []string{"excludes:", "forbids:", "companions:"} {
+		assert.NotContains(t, string(out), key)
+	}
+}
+
 func TestDecision_ToFromFrontmatter(t *testing.T) {
 	d := Decision{
 		ID:     "0042",

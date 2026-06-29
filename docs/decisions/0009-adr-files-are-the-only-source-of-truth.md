@@ -1,0 +1,29 @@
+---
+status: accepted
+date: "2026-06-29"
+category: Decision model
+source: docs/fork-design/0002-drop-index-yaml-and-treat-adr-files-as-the-only-source-of-truth.md
+priority: default
+applies_to:
+    - internal/infrastructure/decision/filerepository.go
+    - internal/domain/decision/lean/load.go
+    - internal/domain/decision/lean/index.go
+    - internal/adapter/command/lean/index.go
+---
+
+# ADR files are the only source of truth — no index or cache
+
+## Decision
+
+The ADR markdown files are the single source of truth. The model is read by scanning the files on every
+read; there is no `index.yaml`, sidecar database, or persistent cache that could drift from the files.
+The generated README index is a pure projection of the files — derived output, never an input.
+
+## Guidance
+
+- Read the model by scanning files (`LoadDir` / the file repository); never introduce a cache or index
+  file that the tool then trusts as authoritative.
+- The generated README (`RenderIndex` / `adg lean index --write`) is regenerated from frontmatter and is
+  never read back as state — treat it as build output, safe to delete and recreate.
+- An optimization that caches parsed records must be in-memory and per-invocation, not persisted as a
+  source of truth.

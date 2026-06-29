@@ -37,14 +37,42 @@ var (
 // records — proposed drafts are work-in-progress. Relationship integrity
 // (supersession, amendment) is checked across the whole set.
 func Validate(records []Record) []Issue {
+	var issues []Issue
+	issues = append(issues, duplicateIDIssues(records)...)
+
 	byID := make(map[string]Record, len(records))
 	for _, r := range records {
 		byID[r.ID] = r
 	}
-
-	var issues []Issue
 	for _, r := range records {
 		issues = append(issues, validateOne(r, byID)...)
+	}
+	return issues
+}
+
+// duplicateIDIssues flags ADRs that resolve to the same NNNN. The ID model is a
+// flat global NNNN across the whole model — `category` frontmatter (not a
+// subfolder) does the grouping — so a collision is always a hard error. The
+// relationship checks below read a last-wins byID map and so would mis-report
+// under duplicates, but the run is already non-zero and the author must fix the
+// ID before those findings can be trusted.
+func duplicateIDIssues(records []Record) []Issue {
+	files := map[string][]string{}
+	var order []string
+	for _, r := range records {
+		if _, seen := files[r.ID]; !seen {
+			order = append(order, r.ID)
+		}
+		files[r.ID] = append(files[r.ID], r.Filename)
+	}
+	var issues []Issue
+	for _, id := range order {
+		if fs := files[id]; len(fs) > 1 {
+			issues = append(issues, Issue{
+				ID:      id,
+				Message: fmt.Sprintf("duplicate ID %s used by %d files (%s); IDs must be a unique flat global NNNN across the whole model", id, len(fs), strings.Join(fs, ", ")),
+			})
+		}
 	}
 	return issues
 }
@@ -63,6 +91,35 @@ func validateOne(r Record, byID map[string]Record) []Issue {
 	case "", "invariant", "default":
 	default:
 		add(fmt.Sprintf("priority %q is not valid (invariant, default, or unset)", r.D.Priority))
+	}
+
+	// Glob syntax + hygiene across every routing field. Brace expansion is a hard
+	// failure (the matcher treats `{` `}` as literals, so a brace glob silently
+	// routes to nothing) with a concrete fix; a single-star segment under a
+	// nestable directory is an advisory nudge.
+	for _, field := range []struct {
+		name  string
+		globs []string
+	}{
+		{"applies_to", r.D.AppliesTo},
+		{"excludes", r.D.Excludes},
+		{"forbids", r.D.Forbids},
+		{"companions", r.D.Companions},
+	} {
+		for _, g := range field.globs {
+			if strings.ContainsAny(g, "{}") {
+				add(fmt.Sprintf("%s glob %q uses brace expansion, which is not supported; write separate globs (one per alternative)", field.name, g))
+			}
+			if sug, ok := singleStarNested(g); ok {
+				warn(fmt.Sprintf("%s glob %q uses a single-star segment under a directory; it won't match nested paths — did you mean %q?", field.name, g, sug))
+			}
+		}
+	}
+
+	// Companions surface only when the record also routes; companions with no
+	// applies_to and no forbids can never appear in a brief.
+	if len(r.D.Companions) > 0 && len(r.D.AppliesTo) == 0 && len(r.D.Forbids) == 0 {
+		warn("companions set but the record has no applies_to or forbids, so it never routes and the companions never surface")
 	}
 
 	p := ParseBody(r.Body)
@@ -155,4 +212,23 @@ func guidanceEmpty(p Parsed) bool {
 
 func bodyLineCount(body string) int {
 	return len(strings.Split(strings.TrimRight(body, "\n"), "\n"))
+}
+
+// singleStarNested reports whether a glob uses a single-star final segment under a
+// directory (e.g. platforms/*.py), which silently misses nested paths, and returns
+// the recursive form (platforms/**/*.py) to suggest. It deliberately inspects only
+// the final segment, so a root-level glob (*.py, main.py) and a mid-path literal
+// tail (a/*/b.py) are not flagged.
+func singleStarNested(pat string) (string, bool) {
+	if strings.Contains(pat, "**") {
+		return "", false
+	}
+	i := strings.LastIndex(pat, "/")
+	if i < 0 {
+		return "", false
+	}
+	if !strings.Contains(pat[i+1:], "*") {
+		return "", false
+	}
+	return pat[:i] + "/**/" + pat[i+1:], true
 }

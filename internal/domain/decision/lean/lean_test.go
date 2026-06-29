@@ -194,3 +194,72 @@ func TestRenderNewBody_ContainsCoreSections(t *testing.T) {
 		}
 	}
 }
+
+func TestValidate_DuplicateID(t *testing.T) {
+	records := []Record{
+		rec("0008", "0008-a.md", "accepted", "Meta", acceptedBody("A"), nil, nil),
+		rec("0008", "sub/0008-b.md", "accepted", "Meta", acceptedBody("B"), nil, nil),
+	}
+	found := false
+	for _, i := range Validate(records) {
+		if !i.Warning && strings.Contains(i.Message, "duplicate ID 0008") &&
+			strings.Contains(i.Message, "0008-a.md") && strings.Contains(i.Message, "0008-b.md") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a hard duplicate-ID issue naming both files; got: %+v", Validate(records))
+	}
+}
+
+func TestValidate_BraceGlobHardFail(t *testing.T) {
+	r := briefRecX("0011", "0011-x.md", "invariant",
+		[]string{"port/{donation_flows,extraction}/**"}, nil, nil, nil, acceptedBody("Single architecture"))
+	found := false
+	for _, i := range Validate([]Record{r}) {
+		if !i.Warning && strings.Contains(i.Message, "brace expansion") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a hard brace-glob issue; got: %+v", Validate([]Record{r}))
+	}
+}
+
+func TestValidate_GlobHygiene_SingleStarNested(t *testing.T) {
+	r := briefRecX("0008", "0008-x.md", "default",
+		[]string{"platforms/*.py"}, nil, nil, nil, acceptedBody("Pages"))
+	found := false
+	for _, i := range Validate([]Record{r}) {
+		if i.Warning && strings.Contains(i.Message, "platforms/**/*.py") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a glob-hygiene suggestion of platforms/**/*.py; got: %+v", Validate([]Record{r}))
+	}
+}
+
+func TestValidate_GlobHygiene_NoFalsePositives(t *testing.T) {
+	r := briefRecX("0008", "0008-x.md", "default",
+		[]string{"port/**/*.py", "*.py", "main.py"}, nil, nil, nil, acceptedBody("Pages"))
+	for _, i := range Validate([]Record{r}) {
+		if strings.Contains(i.Message, "single-star segment") {
+			t.Errorf("recursive/root globs should not warn; got: %s", i.Message)
+		}
+	}
+}
+
+func TestValidate_CompanionsOrphanWarn(t *testing.T) {
+	r := briefRecX("0009", "0009-x.md", "default",
+		nil, nil, nil, []string{"src/App.tsx"}, acceptedBody("Props"))
+	found := false
+	for _, i := range Validate([]Record{r}) {
+		if i.Warning && strings.Contains(i.Message, "companions set but") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a companions-orphan warning; got: %+v", Validate([]Record{r}))
+	}
+}

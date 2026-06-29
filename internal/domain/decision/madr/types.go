@@ -35,11 +35,22 @@ type Decision struct {
 	// machine-checkable counterpart to a prose "Amended by" note). AppliesTo holds
 	// glob patterns (repo-root-relative) that route this ADR to changed files, and
 	// Priority ("invariant" | "default") sets its force in a compiled brief.
-	Source    string
-	Category  string
-	Amends    []string
-	AppliesTo []string
-	Priority  string
+	//
+	// Excludes, Forbids, and Companions refine routing. Excludes carves sanctioned
+	// or out-of-scope paths out of AppliesTo (a path is governed iff some AppliesTo
+	// matches it and no Excludes does). Forbids names negative-space paths that
+	// should not exist (e.g. a second architecture): it routes the brief like
+	// AppliesTo but is exempt from the stale-glob lint and instead warns when it
+	// matches anything. Companions are expected partner edits that are NOT governed
+	// by this ADR — surfaced in the brief as "related files," never routed on.
+	Source     string
+	Category   string
+	Amends     []string
+	AppliesTo  []string
+	Priority   string
+	Excludes   []string
+	Forbids    []string
+	Companions []string
 }
 
 // Comment is one entry in the ADG-extension `comments` frontmatter list.
@@ -70,6 +81,9 @@ type Frontmatter struct {
 	Amends         []string            `yaml:"amends,omitempty"`
 	AppliesTo      []string            `yaml:"applies_to,omitempty"`
 	Priority       string              `yaml:"priority,omitempty"`
+	Excludes       []string            `yaml:"excludes,omitempty"`
+	Forbids        []string            `yaml:"forbids,omitempty"`
+	Companions     []string            `yaml:"companions,omitempty"`
 }
 
 func (d Decision) Frontmatter() Frontmatter {
@@ -89,6 +103,9 @@ func (d Decision) Frontmatter() Frontmatter {
 		Amends:         d.Amends,
 		AppliesTo:      d.AppliesTo,
 		Priority:       d.Priority,
+		Excludes:       d.Excludes,
+		Forbids:        d.Forbids,
+		Companions:     d.Companions,
 	}
 }
 
@@ -109,5 +126,8 @@ func DecisionFromFrontmatter(fm Frontmatter) Decision {
 		Amends:         fm.Amends,
 		AppliesTo:      fm.AppliesTo,
 		Priority:       fm.Priority,
+		Excludes:       fm.Excludes,
+		Forbids:        fm.Forbids,
+		Companions:     fm.Companions,
 	}
 }

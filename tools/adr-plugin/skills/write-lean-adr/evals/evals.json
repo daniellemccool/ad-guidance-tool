@@ -4,7 +4,7 @@
     {
       "id": 0,
       "prompt": "We've decided every uploaded file must pass a safety check before any DDP validation or extraction runs. Record this as a lean ADR that will route to the upload-handling Python code (port/**/*.py) so future edits there get the rule.",
-      "expected_output": "A lean ADR hand-authored at docs/decisions/NNNN-slug.md: status accepted, a one-screen Decision + Guidance body (no MADR Context/Considered Options/Decision Outcome), priority invariant (a safety rule), and applies_to routing covering the upload code (e.g. port/**/*.py). Validated with `adg index --model docs/decisions` (0 failures). Not created with `adg add` — the lean form is hand-authored.",
+      "expected_output": "A lean ADR authored with `adg lean new` at docs/decisions/NNNN-slug.md: status accepted, a one-screen Decision + Guidance body (no MADR Context/Considered Options/Decision Outcome), priority invariant (a safety rule), and applies_to routing covering the upload code (e.g. port/**/*.py). Created with `adg lean new` (which validates the candidate before writing and refuses on a hard failure), not by hand and not with `adg add` (the MADR command); re-validates clean with `adg lean index --model docs/decisions` (0 failures).",
       "files": [],
       "assertions": [
         {
@@ -24,20 +24,20 @@
         },
         {
           "id": "validates_clean",
-          "description": "adg index validates the model",
-          "check": "adg index --model docs/decisions reports 0 failures for the new record"
+          "description": "adg lean index validates the model",
+          "check": "adg lean index --model docs/decisions reports 0 failures for the new record"
         },
         {
-          "id": "hand_authored_not_adg_add",
-          "description": "Authored by writing the file + validating with adg index",
-          "check": "summary shows the file was written directly and validated with adg index, not created via adg add (which is MADR-only)"
+          "id": "authored_with_lean_new",
+          "description": "Authored with `adg lean new`, not by hand and not `adg add`",
+          "check": "summary shows the record was created with `adg lean new` (which validates before writing), not hand-written and not via `adg add` (the MADR command)"
         }
       ]
     },
     {
       "id": 1,
       "prompt": "Before I change port/helpers/flow_builder.py, what architectural rules govern it? Check the decisions first.",
-      "expected_output": "The agent compiles the brief for the path (adg brief --model docs/decisions port/helpers/flow_builder.py), reports the governing ADR and its Decision/Guidance (the safety-before-extraction invariant), and consults it before proposing edits — rather than editing first.",
+      "expected_output": "The agent compiles the brief for the path (adg lean brief --model docs/decisions port/helpers/flow_builder.py), reports the governing ADR and its Decision/Guidance (the safety-before-extraction invariant), and consults it before proposing edits — rather than editing first.",
       "files": [
         {
           "path": "docs/decisions/0001-safety-before-extraction.md",
@@ -48,7 +48,7 @@
         {
           "id": "ran_brief",
           "description": "The agent compiled the brief for the path",
-          "check": "summary shows `adg brief` was run for port/helpers/flow_builder.py against docs/decisions"
+          "check": "summary shows `adg lean brief` was run for port/helpers/flow_builder.py against docs/decisions"
         },
         {
           "id": "surfaced_governing_adr",
@@ -80,7 +80,7 @@
         {
           "id": "ran_brief",
           "description": "The agent compiled the brief for both paths",
-          "check": "summary shows `adg brief` was run for port/legacy_pipeline/new.py and api/d3i_props.py"
+          "check": "summary shows `adg lean brief` was run for port/legacy_pipeline/new.py and api/d3i_props.py"
         },
         {
           "id": "detected_forbidden_violation",

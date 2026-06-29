@@ -3,8 +3,9 @@
 A parallel, agent-first ADR format (alongside the MADR format handled by the write-madr-adr skill). A lean ADR is a
 **one-screen record** whose job is to answer, before an edit: *what rule governs this file, and how do
 I know if I've violated it?* Routing metadata in the frontmatter lets `adg` compile a per-file brief
-(and a PreToolUse hook) deterministically — no LLM. Lean ADRs are hand-authored markdown; `adg lean index`
-validates them and regenerates the grouped README.
+(and a PreToolUse hook) deterministically — no LLM. New lean records are authored with `adg lean new`
+(not by hand), which validates the candidate before it lands; `adg lean index` validates the whole
+model and regenerates the grouped README.
 
 ## Body
 

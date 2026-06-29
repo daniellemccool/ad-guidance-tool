@@ -60,8 +60,23 @@ contract are documented with the tool (`docs/lean-prototype/hook-setup.md`).
 
 ## Author: a lean record
 
-Lean records are hand-authored markdown (there is no `adg add` for the lean form) at
-`docs/decisions/NNNN-slug.md`:
+`adg lean new` authors the record — new lean records are created with it, not by hand. It
+assigns the next flat-global `NNNN` (or `--id`), builds the frontmatter from flags, scaffolds
+the body (or reads it from stdin with `--from-stdin`, taking the H1 from `--title`), validates
+the candidate against the model, and **refuses to write on a hard failure** so an invalid
+record never lands on disk. On success it writes `docs/decisions/NNNN-slug.md`, regenerates the
+README, and prints the new ID to stdout (status and warnings go to stderr).
+
+```bash
+adg lean new --model docs/decisions \
+    --title "Reject unsafe uploads before validation and extraction" \
+    --status accepted --priority invariant --category Extraction \
+    --applies-to 'port/**/*.py' --excludes '**/port_helpers.py'
+# → prints the new ID; scaffolds Decision/Guidance (and a Why scaffold for invariants)
+```
+
+Pass `--from-stdin` to supply the body yourself; otherwise fill in the scaffolded
+Decision / Guidance / Why after it is written. The record it produces:
 
 ```markdown
 ---
@@ -88,8 +103,9 @@ One to three sentences: what was decided.
 ## Checks         # optional; grep targets / invariants, rolled up into the brief
 ```
 
-- **IDs are a flat global `NNNN`** across the whole model; `category` (not a
-  subfolder) groups the index. Duplicate IDs hard-fail.
+- **IDs are a flat global `NNNN`** across the whole model — `adg lean new` assigns the next
+  free one (or `--id NNNN`, which fails if already taken); `category` (not a subfolder)
+  groups the index. Duplicate IDs hard-fail.
 - **Globs** are forward-slash, repo-root-relative, doublestar (`**`). **Brace globs
   `{a,b}` are rejected** — write separate globs, one per alternative. A single-star
   segment under a nestable directory (`platforms/*.py`) is flagged; prefer

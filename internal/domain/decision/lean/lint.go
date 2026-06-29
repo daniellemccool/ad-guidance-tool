@@ -12,14 +12,20 @@ import (
 
 // LintTree runs scope checks that need the actual source tree rooted at root:
 //
-//   - stale applies_to — a glob that matches no file under root (a dead or
-//     mis-typed scope that will mis-route). Reported as a warning.
-//   - overlapping scope — a pair of active, non-invariant ADRs whose globs match
-//     a common file and that are not already related via supersede/amend.
-//     Reported (a warning), not resolved: this is overlap *reporting*, not
-//     semantic conflict detection. Invariants are excluded because they are meant
-//     to co-apply with defaults, so an invariant/default overlap is not a conflict.
-//   - an unparseable glob is a hard issue, not a warning.
+//   - stale applies_to / excludes — a glob that matches no file under root (a dead
+//     or mis-typed scope). Reported as a warning.
+//   - forbids that matches a file — the inverse of stale: a forbids glob marks
+//     negative space and is meant to match nothing, so a match means a forbidden
+//     path now has files. Reported as a warning; forbids is exempt from the stale
+//     check.
+//   - overlapping scope — a pair of active, non-invariant ADRs that govern a
+//     common file and are not already related via supersede/amend. Governed files
+//     come from routeMatch (applies_to minus excludes) — the same routing the brief
+//     and hook use — so overlap can't drift from routing, and an exclusion
+//     correctly drops a file from the overlap set. Reported (a warning), not
+//     resolved: this is overlap *reporting*, not semantic conflict detection.
+//     Invariants are excluded because they are meant to co-apply with defaults.
+//   - an unparseable applies_to / excludes / forbids glob is a hard issue.
 //
 // This is the governance layer a plain scoped-rules system (CODEOWNERS, editor
 // rules) does not provide: it keeps routing metadata honest against the tree.
@@ -30,25 +36,19 @@ func LintTree(records []Record, root string) ([]Issue, error) {
 	}
 
 	var issues []Issue
-	matched := make([]map[string]bool, len(records))
+	governed := make([]map[string]bool, len(records))
 	for i, r := range records {
-		matched[i] = map[string]bool{}
-		for _, pat := range r.D.AppliesTo {
-			re, cerr := regexp.Compile(globToRegexp(pat))
-			if cerr != nil {
-				issues = append(issues, Issue{ID: r.ID, Message: fmt.Sprintf("applies_to %q is not a valid glob", pat)})
-				continue
-			}
-			hit := false
-			for _, f := range files {
-				if re.MatchString(f) {
-					matched[i][f] = true
-					hit = true
-				}
-			}
-			if !hit {
-				issues = append(issues, Issue{ID: r.ID, Warning: true, Message: fmt.Sprintf("applies_to %q matches no files under %s (stale scope)", pat, root)})
-			}
+		// Per-pattern syntax + existence checks. applies_to/excludes are stale when
+		// they match nothing; forbids inverts that (warn when it matches anything).
+		checkGlobs(r, "applies_to", r.D.AppliesTo, files, root, staleWhenEmpty, &issues)
+		checkGlobs(r, "excludes", r.D.Excludes, files, root, staleWhenEmpty, &issues)
+		checkGlobs(r, "forbids", r.D.Forbids, files, root, warnWhenPopulated, &issues)
+
+		// Governed files (applies_to ∧ ¬excludes) come from routeMatch — the single
+		// source of routing truth — so the overlap calc matches the brief/hook.
+		governed[i] = map[string]bool{}
+		for _, f := range routeMatch(r, files).governed {
+			governed[i][f] = true
 		}
 	}
 
@@ -58,7 +58,7 @@ func LintTree(records []Record, root string) ([]Issue, error) {
 			if !overlapEligible(a) || !overlapEligible(b) || related(a, b) {
 				continue
 			}
-			if shared := firstShared(matched[i], matched[j]); shared != "" {
+			if shared := firstShared(governed[i], governed[j]); shared != "" {
 				issues = append(issues, Issue{
 					ID:      a.ID,
 					Warning: true,
@@ -69,6 +69,46 @@ func LintTree(records []Record, root string) ([]Issue, error) {
 	}
 	sort.SliceStable(issues, func(x, y int) bool { return issues[x].ID < issues[y].ID })
 	return issues, nil
+}
+
+// emptyMode selects how checkGlobs reacts to a glob's file count: applies_to and
+// excludes are stale when they match nothing; forbids is the inverse (it is meant
+// to match nothing, so it warns when it matches something).
+type emptyMode int
+
+const (
+	staleWhenEmpty emptyMode = iota
+	warnWhenPopulated
+)
+
+// checkGlobs validates one routing field's globs against the tree: an unparseable
+// glob is a hard issue, and depending on mode an empty match (stale) or a
+// non-empty match (forbidden path now populated) is a warning.
+func checkGlobs(r Record, field string, pats []string, files []string, root string, mode emptyMode, issues *[]Issue) {
+	for _, pat := range pats {
+		re, cerr := regexp.Compile(globToRegexp(pat))
+		if cerr != nil {
+			*issues = append(*issues, Issue{ID: r.ID, Message: fmt.Sprintf("%s %q is not a valid glob", field, pat)})
+			continue
+		}
+		firstHit := ""
+		for _, f := range files {
+			if re.MatchString(f) {
+				firstHit = f
+				break
+			}
+		}
+		switch mode {
+		case staleWhenEmpty:
+			if firstHit == "" {
+				*issues = append(*issues, Issue{ID: r.ID, Warning: true, Message: fmt.Sprintf("%s %q matches no files under %s (stale scope)", field, pat, root)})
+			}
+		case warnWhenPopulated:
+			if firstHit != "" {
+				*issues = append(*issues, Issue{ID: r.ID, Warning: true, Message: fmt.Sprintf("%s %q matches an existing file (%s); a forbidden path now has files", field, pat, firstHit)})
+			}
+		}
+	}
 }
 
 func listFiles(root string) ([]string, error) {

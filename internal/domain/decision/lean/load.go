@@ -12,6 +12,12 @@ import (
 // LoadDir walks modelPath and loads every NNNN-slug.md file as a lean Record,
 // parsing frontmatter and body. Non-ADR markdown (e.g. README.md) is skipped.
 // Records are returned sorted by ID. Record.Filename is relative to modelPath.
+//
+// IDs are a flat global NNNN across the whole model: the number is unique
+// model-wide and index grouping comes from `category` frontmatter, not the
+// directory layout. (The legacy per-subfolder AD#### scheme collided once the same
+// number appeared in two folders; Validate hard-fails any duplicate ID — see
+// duplicateIDIssues.)
 func LoadDir(modelPath string) ([]Record, error) {
 	var records []Record
 	err := filepath.WalkDir(modelPath, func(path string, e fs.DirEntry, err error) error {

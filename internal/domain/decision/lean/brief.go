@@ -8,23 +8,26 @@ import (
 )
 
 // Brief compiles an agent-facing guidance packet for a set of changed paths: the
-// ADRs whose applies_to globs match, grouped by force (invariants first, then
-// defaults), each reduced to its Decision, Guidance bullets, and a traceability
-// pointer back to the full record — plus a consolidated list of any Checks. This
-// is the deterministic core of "before I touch this code, what rules constrain
-// me?": pure path routing, no LLM, suitable for a pre-edit hook or CI.
+// ADRs whose applies_to globs match (via the routeMatch kernel in route.go),
+// grouped by force (invariants first, then defaults), each reduced to its
+// Decision, Guidance bullets, and a traceability pointer back to the full record —
+// plus a consolidated list of any Checks. This is the deterministic core of
+// "before I touch this code, what rules constrain me?": pure path routing, no LLM,
+// suitable for a pre-edit hook or CI. Brief renders; route.go decides.
 func Brief(records []Record, changedPaths []string) string {
 	type hit struct {
-		rec     Record
-		matched []string
+		rec   Record
+		route routeResult
 	}
 	var invariants, defaults []hit
 	for _, r := range records {
-		matched := matchedPatterns(r, changedPaths)
-		if len(matched) == 0 {
+		route := routeMatch(r, changedPaths)
+		// A record enters the brief when it governs a changed path or when a
+		// forbids glob is violated; companions alone never route.
+		if len(route.matched) == 0 && len(route.forbidden) == 0 {
 			continue
 		}
-		h := hit{rec: r, matched: matched}
+		h := hit{rec: r, route: route}
 		if strings.EqualFold(strings.TrimSpace(r.D.Priority), "invariant") {
 			invariants = append(invariants, h)
 		} else {
@@ -58,13 +61,13 @@ func Brief(records []Record, changedPaths []string) string {
 	if len(invariants) > 0 {
 		b.WriteString("\n## Hard constraints (invariants)\n\n")
 		for _, h := range invariants {
-			b.WriteString(briefEntry(h.rec, h.matched, true))
+			b.WriteString(briefEntry(h.rec, h.route, true))
 		}
 	}
 	if len(defaults) > 0 {
 		b.WriteString("\n## Defaults & conventions\n\n")
 		for _, h := range defaults {
-			b.WriteString(briefEntry(h.rec, h.matched, false))
+			b.WriteString(briefEntry(h.rec, h.route, false))
 		}
 	}
 
@@ -85,43 +88,33 @@ func Brief(records []Record, changedPaths []string) string {
 	return b.String()
 }
 
-// Matches reports whether any record's applies_to globs match a changed path —
-// the cheap gate the hook uses to decide whether to inject anything at all.
-func Matches(records []Record, changedPaths []string) bool {
-	for _, r := range records {
-		if len(matchedPatterns(r, changedPaths)) > 0 {
-			return true
-		}
-	}
-	return false
-}
-
-// matchedPatterns returns the record's applies_to globs that match at least one
-// changed path. A record with no applies_to never matches (it does not auto-route).
-func matchedPatterns(r Record, changedPaths []string) []string {
-	var matched []string
-	for _, pat := range r.D.AppliesTo {
-		re, err := regexp.Compile(globToRegexp(pat))
-		if err != nil {
-			continue
-		}
-		for _, p := range changedPaths {
-			if re.MatchString(p) {
-				matched = append(matched, pat)
-				break
-			}
-		}
-	}
-	return matched
-}
-
-func briefEntry(r Record, matched []string, includeWhy bool) string {
+func briefEntry(r Record, route routeResult, includeWhy bool) string {
 	p := ParseBody(r.Body)
 	guidance := guidanceSection(p)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "### ADR-%s — %s\n", r.ID, p.Title)
-	fmt.Fprintf(&b, "_scope: %s · matched: %s_\n\n", strings.Join(r.D.AppliesTo, ", "), strings.Join(matched, ", "))
+
+	// Scope line. A governed record shows which applies_to globs matched (plus any
+	// excludes that suppressed a sibling path). A forbids-only hit has no matched
+	// glob, so it shows the forbids scope rather than an empty `matched:`.
+	if len(route.matched) > 0 {
+		fmt.Fprintf(&b, "_scope: %s · matched: %s", strings.Join(r.D.AppliesTo, ", "), strings.Join(route.matched, ", "))
+		if len(route.excluded) > 0 {
+			fmt.Fprintf(&b, " · excluded: %s", strings.Join(route.excluded, ", "))
+		}
+		b.WriteString("_\n\n")
+	} else {
+		fmt.Fprintf(&b, "_scope: forbids %s_\n\n", strings.Join(route.forbidden, ", "))
+	}
+
+	// A forbids hit is a violation — the change touches negative-space the ADR marks
+	// off-limits. We store the matched globs (not the offending path), so this is
+	// phrased as a scope match, not a single "forbidden path".
+	if len(route.forbidden) > 0 {
+		fmt.Fprintf(&b, "**⚠ Forbidden scope matched:** `%s` — ADR-%s marks these paths off-limits; do not add files here.\n\n", strings.Join(route.forbidden, ", "), r.ID)
+	}
+
 	if d := p.Sections["decision"]; d != "" {
 		fmt.Fprintf(&b, "**Decision:** %s\n\n", oneLine(d))
 	}
@@ -129,6 +122,16 @@ func briefEntry(r Record, matched []string, includeWhy bool) string {
 		b.WriteString("**Guidance:**\n")
 		for _, line := range bulletLines(guidance) {
 			fmt.Fprintf(&b, "- %s\n", line)
+		}
+		b.WriteString("\n")
+	}
+	// Companions are expected partner edits this ADR does not govern; list them so
+	// the agent considers them, with a soft note when the current change touches
+	// none of them.
+	if len(r.D.Companions) > 0 {
+		fmt.Fprintf(&b, "**Related files to consider:** %s\n", strings.Join(r.D.Companions, ", "))
+		if len(route.companionsHit) == 0 {
+			b.WriteString("_(none of the changed paths are among these — listed for context)_\n")
 		}
 		b.WriteString("\n")
 	}

@@ -25,15 +25,21 @@ func NewBriefCommand(config domain.ConfigService) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "brief [changed-path...]",
 		Short: "Compile the architecture guidance brief for changed files",
-		Long: `Brief routes changed file paths to the ADRs that govern them (by their
-applies_to globs) and prints a compact guidance packet: the matching ADRs grouped
-by force (invariants first), each with its Decision, Guidance, and Checks.
+		Long: `Brief routes changed file paths to the ADRs that govern them and prints a
+compact guidance packet: the matching ADRs grouped by force (invariants first),
+each with its Decision, Guidance, and Checks.
+
+Routing is by frontmatter globs: applies_to selects, excludes carves out sanctioned
+or out-of-scope paths, and forbids flags edits to negative-space paths; companions
+are surfaced as related files. Without --hook, brief also validates the model and
+prints any issues (e.g. an unsupported brace glob) to stderr, exiting non-zero on a
+hard failure, so a malformed scope is never silently mis-routed.
 
 With --hook it runs as a Claude Code PreToolUse hook: it reads the hook JSON on
 stdin and injects the brief for the edited file as additionalContext. Hook mode is
 fail-open — any error injects nothing and never blocks the edit.`,
-		// Errors describe model state, not CLI misuse.
-		SilenceUsage: true,
+		SilenceErrors: true, // issues already printed to stderr
+		SilenceUsage:  true, // failure is data, not user error
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if hook {
 				return runHook(cmd, modelPath, config)
@@ -41,16 +47,27 @@ fail-open — any error injects nothing and never blocks the edit.`,
 
 			resolved, err := util.ResolveModelPathOrDefault(modelPath, config)
 			if err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 				return err
 			}
 			if len(args) == 0 {
-				return fmt.Errorf("provide one or more changed paths, or use --hook")
+				err := fmt.Errorf("provide one or more changed paths, or use --hook")
+				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
+				return err
 			}
 			records, err := leandomain.LoadDir(resolved)
 			if err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 				return err
 			}
+			// Non-hook brief is fail-closed: surface model problems (e.g. an
+			// unsupported brace glob that would silently mis-route) to stderr rather
+			// than render a wrong brief in silence. runHook stays fail-open.
+			hard := reportLeanIssues(cmd.ErrOrStderr(), leandomain.Validate(records))
 			fmt.Fprint(cmd.OutOrStdout(), leandomain.Brief(records, args))
+			if hard > 0 {
+				return ErrLeanValidationIssues
+			}
 			return nil
 		},
 	}
@@ -79,4 +96,20 @@ func runHook(cmd *cobra.Command, modelPath string, config domain.ConfigService) 
 		fmt.Fprintln(cmd.OutOrStdout(), out)
 	}
 	return nil
+}
+
+// reportLeanIssues prints validation issues to w in the same [FAIL]/[warn] form as
+// `adg index`, returning the number of hard failures (so a caller can exit non-zero).
+func reportLeanIssues(w io.Writer, issues []leandomain.Issue) int {
+	hard := 0
+	for _, is := range issues {
+		kind := "FAIL"
+		if is.Warning {
+			kind = "warn"
+		} else {
+			hard++
+		}
+		fmt.Fprintf(w, "[%s] %s: %s\n", kind, is.ID, is.Message)
+	}
+	return hard
 }

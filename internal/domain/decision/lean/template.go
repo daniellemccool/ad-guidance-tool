@@ -11,7 +11,10 @@
 // differ.
 package lean
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // LeanBodyTemplate is the body scaffold a new lean ADR is created with.
 // Frontmatter (status, category, source) is rendered separately by
@@ -35,7 +38,19 @@ const LeanBodyTemplate = `# %s
 
 // RenderNewBody emits the lean body scaffold for a freshly-created ADR.
 func RenderNewBody(title string) string {
-	return fmt.Sprintf(LeanBodyTemplate, title)
+	return RenderNewBodyFor(title, "")
+}
+
+// RenderNewBodyFor emits the lean body scaffold, adding a `## Why` stub only for
+// invariants. Rationale is expected on an invariant (it is what lets an agent
+// reason about an override instead of silently weakening the rule), so the
+// scaffold prompts for it rather than leaving the author to remember.
+func RenderNewBodyFor(title, priority string) string {
+	body := fmt.Sprintf(LeanBodyTemplate, title)
+	if strings.EqualFold(strings.TrimSpace(priority), "invariant") {
+		body += "\n## Why\n\n{...}\n"
+	}
+	return body
 }
 
 // PlaceholderTokens are the literal scaffolding strings emitted by the lean

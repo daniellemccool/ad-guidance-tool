@@ -1,7 +1,7 @@
 {
   "name": "write-adr",
-  "version": "0.1.0",
-  "description": "Create and manage Architectural Decision Records in MADR format with the adg CLI. Ships with ad-guidance-tool so the guidance tracks the tool's CLI in lockstep.",
+  "version": "0.2.0",
+  "description": "Architectural Decision Record skills for the adg CLI: write-madr-adr (durable MADR records) and write-lean-adr (compact lean records plus routing/governance). Ships with ad-guidance-tool so the guidance tracks the tool's CLI in lockstep.",
   "author": {
     "name": "Danielle McCool"
   },

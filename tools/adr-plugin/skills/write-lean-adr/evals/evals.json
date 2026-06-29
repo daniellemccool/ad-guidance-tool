@@ -33,66 +33,6 @@
           "check": "summary shows the record was created with `adg lean new` (which validates before writing), not hand-written and not via `adg add` (the MADR command)"
         }
       ]
-    },
-    {
-      "id": 1,
-      "prompt": "Before I change port/helpers/flow_builder.py, what architectural rules govern it? Check the decisions first.",
-      "expected_output": "The agent compiles the brief for the path (adg lean brief --model docs/decisions port/helpers/flow_builder.py), reports the governing ADR and its Decision/Guidance (the safety-before-extraction invariant), and consults it before proposing edits — rather than editing first.",
-      "files": [
-        {
-          "path": "docs/decisions/0001-safety-before-extraction.md",
-          "content": "---\nstatus: accepted\ncategory: Extraction\npriority: invariant\napplies_to:\n    - port/**/*.py\n---\n\n# Reject unsafe uploads before validation and extraction\n\n## Decision\n\nEvery uploaded file passes a safety check before any DDP validation or extraction runs.\n\n## Guidance\n\n- Call the safety check first; never validate or extract an unchecked upload.\n"
-        }
-      ],
-      "assertions": [
-        {
-          "id": "ran_brief",
-          "description": "The agent compiled the brief for the path",
-          "check": "summary shows `adg lean brief` was run for port/helpers/flow_builder.py against docs/decisions"
-        },
-        {
-          "id": "surfaced_governing_adr",
-          "description": "The governing ADR's guidance is reported",
-          "check": "the safety-before-extraction invariant (Decision/Guidance) is surfaced as governing the file"
-        },
-        {
-          "id": "consulted_before_edit",
-          "description": "Rules are consulted before editing",
-          "check": "the agent checks the brief before proposing changes, not after"
-        }
-      ]
-    },
-    {
-      "id": 2,
-      "prompt": "I'm about to create port/legacy_pipeline/new.py and also edit api/d3i_props.py. Check docs/decisions first and tell me how to proceed.",
-      "expected_output": "The agent compiles the brief for both paths. It recognizes port/legacy_pipeline/new.py hits a FORBIDDEN scope (a violation — stop and reconsider, the second pipeline is off-limits), and that editing api/d3i_props.py has a companion (packages/data-collector/src/App.tsx) to also update — treating the companion as a related edit to consider, not as a file the ADR governs.",
-      "files": [
-        {
-          "path": "docs/decisions/0001-single-extraction.md",
-          "content": "---\nstatus: accepted\ncategory: Extraction\npriority: invariant\nforbids:\n    - port/legacy_pipeline/**/*.py\n---\n\n# Single extraction architecture\n\n## Decision\n\nThere is exactly one extraction architecture; a second under port/legacy_pipeline is forbidden.\n\n## Guidance\n\n- Do not create a parallel extraction pipeline.\n"
-        },
-        {
-          "path": "docs/decisions/0002-d3i-props.md",
-          "content": "---\nstatus: accepted\ncategory: Props\npriority: default\napplies_to:\n    - api/d3i_props.py\ncompanions:\n    - packages/data-collector/src/App.tsx\n---\n\n# Separate D3I props\n\n## Decision\n\nD3I props live in api/d3i_props.py, separate from upstream props.\n\n## Guidance\n\n- When adding a renderable prop, register it with the TS factory.\n"
-        }
-      ],
-      "assertions": [
-        {
-          "id": "ran_brief",
-          "description": "The agent compiled the brief for both paths",
-          "check": "summary shows `adg lean brief` was run for port/legacy_pipeline/new.py and api/d3i_props.py"
-        },
-        {
-          "id": "detected_forbidden_violation",
-          "description": "Forbidden scope is treated as a violation",
-          "check": "the agent flags port/legacy_pipeline/new.py as hitting a forbidden scope and advises stopping/reconsidering rather than proceeding"
-        },
-        {
-          "id": "handled_companion_as_related",
-          "description": "Companion treated as related, not governed",
-          "check": "the agent notes packages/data-collector/src/App.tsx as a related edit to consider for the d3i_props change, without claiming the ADR governs that file"
-        }
-      ]
     }
   ]
 }

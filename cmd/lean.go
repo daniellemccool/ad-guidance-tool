@@ -20,6 +20,9 @@ func init() {
 		leancmd.NewLeanNewCommand(configSvc),
 		leancmd.NewBriefCommand(configSvc),
 		leancmd.NewIndexCommand(configSvc),
+		leancmd.NewVerifyCommand(configSvc),
+		leancmd.NewCheckCommand(configSvc),
+		leancmd.NewReviewCommand(configSvc),
 	)
 	rootCmd.AddCommand(leanCmd)
 }

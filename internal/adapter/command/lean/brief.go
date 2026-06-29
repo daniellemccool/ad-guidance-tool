@@ -20,14 +20,15 @@ import (
 // --hook it runs as a Claude Code PreToolUse hook over stdin.
 func NewBriefCommand(config domain.ConfigService) *cobra.Command {
 	var modelPath string
-	var hook bool
+	var hook, full, compact bool
 
 	cmd := &cobra.Command{
 		Use:   "brief [changed-path...]",
 		Short: "Compile the architecture guidance brief for changed files",
 		Long: `Brief routes changed file paths to the ADRs that govern them and prints a
 compact guidance packet: the matching ADRs grouped by force (invariants first),
-each with its Decision, Guidance, and Checks.
+each with its Decision and Guidance, and a "Before you finish" footer that re-runs
+the index gate and lists the matched ADRs' Checks and named test files.
 
 Routing is by frontmatter globs: applies_to selects, excludes carves out sanctioned
 or out-of-scope paths, and forbids flags edits to negative-space paths; companions
@@ -35,14 +36,32 @@ are surfaced as related files. Without --hook, brief also validates the model an
 prints any issues (e.g. an unsupported brace glob) to stderr, exiting non-zero on a
 hard failure, so a malformed scope is never silently mis-routed.
 
+By default the brief is rendered in auto mode: full entries, but if the brief would
+exceed one screen the defaults collapse to a one-line checklist (invariants and
+forbidden-path hits always stay full). --full forces every entry full with scope
+detail (the debuggable form); --compact forces the condensed form.
+
 With --hook it runs as a Claude Code PreToolUse hook: it reads the hook JSON on
 stdin and injects the brief for the edited file as additionalContext. Hook mode is
-fail-open — any error injects nothing and never blocks the edit.`,
+fail-open — any error injects nothing and never blocks the edit. Hook mode always
+uses auto rendering; --full/--compact are invalid with --hook.`,
 		SilenceErrors: true, // issues already printed to stderr
 		SilenceUsage:  true, // failure is data, not user error
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if hook {
+				if full || compact {
+					err := fmt.Errorf("--full/--compact are invalid with --hook (hook mode always uses auto rendering)")
+					fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
+					return err
+				}
 				return runHook(cmd, modelPath, config)
+			}
+
+			mode := leandomain.BriefAuto
+			if full {
+				mode = leandomain.BriefFull
+			} else if compact {
+				mode = leandomain.BriefCompact
 			}
 
 			resolved, err := util.ResolveModelPathOrDefault(modelPath, config)
@@ -64,7 +83,7 @@ fail-open — any error injects nothing and never blocks the edit.`,
 			// unsupported brace glob that would silently mis-route) to stderr rather
 			// than render a wrong brief in silence. runHook stays fail-open.
 			hard := reportLeanIssues(cmd.ErrOrStderr(), leandomain.Validate(records))
-			fmt.Fprint(cmd.OutOrStdout(), leandomain.Brief(records, args))
+			fmt.Fprint(cmd.OutOrStdout(), leandomain.Brief(records, args, mode))
 			if hard > 0 {
 				return ErrLeanValidationIssues
 			}
@@ -74,6 +93,9 @@ fail-open — any error injects nothing and never blocks the edit.`,
 
 	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (optional if configured)")
 	cmd.Flags().BoolVar(&hook, "hook", false, "Claude Code PreToolUse hook mode: read hook JSON from stdin and inject the brief for the edited file")
+	cmd.Flags().BoolVar(&full, "full", false, "Render every governing ADR in full, with scope/matched detail (debuggable)")
+	cmd.Flags().BoolVar(&compact, "compact", false, "Render defaults as a one-line checklist; invariants and forbidden-path hits stay full")
+	cmd.MarkFlagsMutuallyExclusive("full", "compact")
 	return cmd
 }
 

@@ -16,7 +16,7 @@ func rec(id, filename, status, category string, body string, supersedes, amends 
 }
 
 func acceptedBody(title string) string {
-	return "# " + title + "\n\n## Decision\n\nWe do X.\n\n## Implication\n\nNew code must do Y.\n"
+	return "# " + title + "\n\n## Decision\n\nWe do X.\n\n## Implication\n\n- New code must do Y.\n"
 }
 
 func TestParseBody_SectionsAndTitle(t *testing.T) {
@@ -27,7 +27,7 @@ func TestParseBody_SectionsAndTitle(t *testing.T) {
 	if got := p.Sections["decision"]; got != "We do X." {
 		t.Errorf("decision = %q", got)
 	}
-	if got := p.Sections["implication"]; got != "New code must do Y." {
+	if got := p.Sections["implication"]; got != "- New code must do Y." {
 		t.Errorf("implication = %q", got)
 	}
 }
@@ -36,6 +36,84 @@ func TestValidate_AcceptedHappyPath(t *testing.T) {
 	issues := Validate([]Record{rec("0001", "0001-x.md", "accepted", "Meta", acceptedBody("Use X"), nil, nil)})
 	if len(issues) != 0 {
 		t.Fatalf("expected no issues, got: %+v", issues)
+	}
+}
+
+func hasIssue(issues []Issue, substr string) bool {
+	for _, i := range issues {
+		if strings.Contains(i.Message, substr) {
+			return true
+		}
+	}
+	return false
+}
+
+// leanRec builds a record with a priority set (rec() does not), for the leanness lints.
+func leanRec(id, status, priority, body string) Record {
+	return Record{ID: id, Filename: id + "-x.md", Body: body,
+		D: madr.Decision{Status: status, Priority: priority, Category: "Meta"}}
+}
+
+func TestValidate_DecisionContainsListWarns(t *testing.T) {
+	body := "# T\n\n## Decision\n\n- one rule\n- another rule\n\n## Guidance\n\n- do x\n"
+	issues := Validate([]Record{leanRec("0001", "accepted", "default", body)})
+	if !hasIssue(issues, "Decision contains a list") {
+		t.Errorf("expected a Decision-contains-a-list warning; got: %+v", issues)
+	}
+}
+
+func TestValidate_DecisionTooLongWarns(t *testing.T) {
+	body := "# T\n\n## Decision\n\n" + strings.Repeat("word ", 70) + "\n\n## Guidance\n\n- do x\n"
+	issues := Validate([]Record{leanRec("0001", "accepted", "default", body)})
+	if !hasIssue(issues, "words (>") {
+		t.Errorf("expected a Decision-too-long warning; got: %+v", issues)
+	}
+}
+
+func TestValidate_DecisionWordCountIgnoresCodeSpans(t *testing.T) {
+	// A long inline code span must not count toward the Decision word limit.
+	body := "# T\n\n## Decision\n\nUse `" + strings.Repeat("x", 400) + "` for the thing.\n\n## Guidance\n\n- do x\n"
+	if issues := Validate([]Record{leanRec("0001", "accepted", "default", body)}); hasIssue(issues, "words (>") {
+		t.Errorf("inline code spans must not count toward the Decision word limit; got: %+v", issues)
+	}
+}
+
+func TestValidate_GuidanceNoListItemWarns(t *testing.T) {
+	body := "# T\n\n## Decision\n\nWe do X.\n\n## Guidance\n\nJust prose, no bullets here.\n"
+	issues := Validate([]Record{leanRec("0001", "accepted", "default", body)})
+	if !hasIssue(issues, "Guidance has no list item") {
+		t.Errorf("expected a Guidance-no-list-item warning; got: %+v", issues)
+	}
+}
+
+func TestValidate_InvariantWithoutWhyWarns(t *testing.T) {
+	body := "# T\n\n## Decision\n\nWe do X.\n\n## Guidance\n\n- do x\n"
+	if issues := Validate([]Record{leanRec("0001", "accepted", "invariant", body)}); !hasIssue(issues, "invariant has no Why") {
+		t.Errorf("expected an invariant-has-no-Why warning; got: %+v", issues)
+	}
+	withWhy := body + "\n## Why\n\nRemoving it silently breaks the privacy boundary.\n"
+	if issues := Validate([]Record{leanRec("0001", "accepted", "invariant", withWhy)}); hasIssue(issues, "invariant has no Why") {
+		t.Errorf("a populated ## Why should clear the warning; got: %+v", issues)
+	}
+}
+
+func TestValidate_LeanLintsSkipPlaceholders(t *testing.T) {
+	// A fresh default-priority scaffold is all {...} placeholders — nothing to lint.
+	scaffold := RenderNewBodyFor("T", "")
+	for _, i := range Validate([]Record{leanRec("0001", "proposed", "default", scaffold)}) {
+		if strings.Contains(i.Message, "Decision ") || strings.Contains(i.Message, "Guidance has no list") {
+			t.Errorf("scaffold placeholders must not trip leanness lints; got: %s", i.Message)
+		}
+	}
+}
+
+func TestValidate_LeanLintsSkipTerminalRecords(t *testing.T) {
+	// A deprecated record with a listy Decision is frozen history, not a nudge target.
+	body := "# T\n\n## Decision\n\n- a\n- b\n\n## Guidance\n\nprose\n"
+	for _, i := range Validate([]Record{leanRec("0001", "deprecated", "default", body)}) {
+		if strings.Contains(i.Message, "Decision contains a list") || strings.Contains(i.Message, "Guidance has no list") {
+			t.Errorf("terminal records should be exempt from leanness lints; got: %s", i.Message)
+		}
 	}
 }
 

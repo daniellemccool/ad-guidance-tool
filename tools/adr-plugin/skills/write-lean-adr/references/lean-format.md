@@ -7,6 +7,10 @@ I know if I've violated it?* Routing metadata in the frontmatter lets `adg` comp
 (not by hand), which validates the candidate before it lands; `adg lean index` validates the whole
 model and regenerates the grouped README.
 
+This file is the **format spec** (structure, frontmatter, validation). For *how to keep a record
+lean* — Decision = one rule, first-bullet-load-bearing, prohibition-as-`forbids`, scope-to-the-
+enforcement-points — see the companion `lean-rubric.md`.
+
 ## Body
 
 | Section | Required | Content |
@@ -38,12 +42,31 @@ IDs hard-fail `adg lean index`.
 | `excludes` | []glob | repo-root-relative | Carves paths out of `applies_to`: a path is governed iff some `applies_to` matches **and** no `excludes` does. Use for a rule's sanctioned home or out-of-scope subpaths. |
 | `forbids` | []glob | repo-root-relative | Negative-space scope — paths that should not exist. Routes the brief as a **violation** when matched, is exempt from the stale lint, and warns when it matches a real file. |
 | `companions` | []glob | repo-root-relative | Expected partner edits this ADR does **not** govern. Surfaced as "related files"; never routes. |
+| `checks` | []Check | see below | Executable grep assertions, run by `adg lean check`. |
 | `source` | string | free text | Provenance (a durable deliberation artifact, not a branch name). |
 | `supersedes` / `amends` | []NNNN | | Relationship integrity (forward + reverse links checked). |
 | `tags` | []string | | Free metadata. |
 | `date` | string | `YYYY-MM-DD` | |
 
 All routing keys are `omitempty` — omit what you do not use.
+
+### Executable checks (`checks`)
+
+A `checks` entry is a **grep assertion** `adg lean check` runs against the tree — the
+machine-checkable counterpart to a prose `## Checks` bullet (arbitrary commands are not
+supported; see ADR-0010). Keep prose checks in the body and automatable ones here.
+
+```yaml
+checks:
+    - desc: no UI render constructed outside port_helpers   # human statement (required)
+      grep: 'CommandUIRender\('                              # regexp (required)
+      in:     ["port/**/*.py"]                               # scope globs (default: whole tree)
+      except: ["**/port_helpers.py"]                         # carve-outs (optional)
+      expect: absent                                         # absent (default) | present
+```
+
+`expect: absent` fails if `grep` matches anywhere in scope (a violation); `present` fails if it
+matches nowhere. `adg lean index` hard-fails a check with no `grep` or a bad regexp.
 
 ## Glob rules
 
@@ -60,13 +83,17 @@ A zero-dependency doublestar matcher (`glob.go`); forward slashes, repo-root-rel
 ## What enforces what
 
 Routing is **advisory**; enforcement is the index/lint/checks layer. "No brief appeared" never means
-"no rule applies." The brief, the hook gate, and the index overlap check all route through one kernel
+"no rule applies." The brief, the hook gate, and the overlap diagnostic all route through one kernel
 (`route.go`), so they cannot disagree about what a rule governs.
 
 | Surface | Mode | Enforces |
 |---|---|---|
-| `adg lean brief --hook` (PreToolUse) | advisory, **fail-open** | Injects the matching ADRs for the edited file. Fires only on Claude `Edit`/`Write`/`MultiEdit`; misses shell/formatter/human/other-agent edits. |
-| `adg lean brief <paths>` | advisory, **fail-closed on a bad model** | Compiles the brief; also runs validation and prints issues (e.g. a brace glob) to stderr, exiting non-zero on a hard failure. |
-| `adg lean index` | **hard gate** | Duplicate ID and brace glob (hard); glob-hygiene, over-length body, missing category (warn); status vocabulary and supersede/amend integrity. |
-| `adg lean index --root <tree>` | **hard gate + scope lint** | All of the above, plus: stale `applies_to`/`excludes` (match nothing), `forbids` that now matches a file, and default-vs-default scope overlap (computed on `applies_to` minus `excludes`). |
-| `## Checks` | manual / future `check --diff` | Prose today, rolled into the brief; executable checks are a separate, later bet. |
+| `adg lean brief --hook` (PreToolUse) | advisory, **fail-open** | Injects the matching ADRs for the edited file (auto rendering — defaults condense on a hub file). Fires only on Claude `Edit`/`Write`/`MultiEdit`; misses shell/formatter/human/other-agent edits. |
+| `adg lean brief <paths>` | advisory, **fail-closed on a bad model** | Compiles the brief (auto; `--full`/`--compact` to force a mode); also runs validation and prints issues (e.g. a brace glob) to stderr, exiting non-zero on a hard failure. |
+| `adg lean index` | **hard gate** | Duplicate ID and brace glob (hard); glob-hygiene, over-length body, missing category, and leanness nudges — Decision-as-list / over-length, Guidance-without-a-bullet, invariant-without-`Why` (warn; advisory, skipped on terminal records and scaffold placeholders — see `lean-rubric.md`); status vocabulary and supersede/amend integrity. |
+| `adg lean index --root <tree>` | **hard gate + scope lint** | All of the above, plus: stale `applies_to`/`excludes` (match nothing) and `forbids` that now matches a file. |
+| `adg lean index --root <tree> --overlaps[=pairs]` | advisory **diagnostic** (opt-in) | Default-vs-default scope overlap (computed on `applies_to` minus `excludes`), as an `[info]` block — grouped per-hub summary, or `=pairs` for per-pair detail. Never a failure; off by default because benign overlap floods CI. |
+| `adg lean check [paths]` | **hard gate** (code-level) | Runs the frontmatter `checks` (grep assertions) against the tree; a failed assertion exits non-zero. With paths, searches only those files ("check what changed"). |
+| `adg lean verify [--hook]` | advisory (Stop hook) / **gate** (CLI) | Re-runs validation + scope lint + `checks` and re-renders the brief footer for changed files. `--hook` is fail-open (exit 0, never blocks stopping); without it, a hard finding exits non-zero. |
+| `adg lean review [--fail-on-revise]` | advisory **LLM judge** | Judges records against the authoring rubric with Claude (default `claude-sonnet-4-6`; `--reviewer` to escalate), printing a pass/revise verdict + rubric-anchored fixes. The one LLM surface (ADR-0011); advisory unless `--fail-on-revise`. Needs `ANTHROPIC_API_KEY`. |
+| `## Checks` (prose) | manual | Human checks rolled into the brief footer; the automatable ones move to frontmatter `checks`. |

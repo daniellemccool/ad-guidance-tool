@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "write-adr",
-      "description": "ADR skills for adg: durable MADR records (write-madr-adr) and lean records plus routing/governance (write-lean-adr).",
+      "description": "ADR skills for adg: durable MADR records (write-madr-adr), authoring lean records (write-lean-adr), and obeying lean ADR briefs while changing code (follow-adr-governance).",
       "source": "./tools/adr-plugin",
       "category": "development",
       "homepage": "https://github.com/daniellemccool/ad-guidance-tool"

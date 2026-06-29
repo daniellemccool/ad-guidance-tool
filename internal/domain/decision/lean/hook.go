@@ -41,7 +41,7 @@ func HookContext(records []Record, payload []byte) string {
 	out, err := json.Marshal(map[string]any{
 		"hookSpecificOutput": map[string]any{
 			"hookEventName":     "PreToolUse",
-			"additionalContext": Brief(records, []string{rel}),
+			"additionalContext": Brief(records, []string{rel}, BriefAuto),
 		},
 	})
 	if err != nil {

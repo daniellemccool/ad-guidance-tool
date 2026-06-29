@@ -62,3 +62,16 @@ var PlaceholderTokens = []string{"{...}"}
 // validator warning (not a hard failure) — the "if it runs past one screen,
 // it's probably two ADRs" forcing function, enforced gently.
 const MaxBodyLines = 60
+
+// MaxBriefLines is the soft ceiling for a compiled brief in BriefAuto mode. A brief
+// that renders longer than this re-renders its defaults compactly, so a hub file —
+// one that many ADRs govern — does not inject a wall of full entries as
+// additionalContext on every edit. Mirrors MaxBodyLines: a one-screen budget,
+// applied to the brief rather than the record.
+const MaxBriefLines = 60
+
+// MaxDecisionWords is the soft ceiling for a Decision section (inline code spans
+// excluded). A lean Decision states the rule in one to three sentences; a longer
+// one is usually a paragraph that has absorbed per-case detail belonging in
+// Guidance. Over the ceiling earns an advisory warning, not a failure.
+const MaxDecisionWords = 60

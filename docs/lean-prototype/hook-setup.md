@@ -72,3 +72,34 @@ prints nothing.
 - **Contract:** `PreToolUse` + exit 0 + `{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"…"}}`
   injects to the model without blocking the edit. The logic lives in `lean.HookContext`
   (`internal/domain/decision/lean/hook.go`); `adg lean brief --hook` is a thin stdin/stdout shell.
+
+## Post-edit hook (optional): re-check on stop
+
+The PreToolUse hook prevents mistakes *before* an edit; a **Stop** hook catches misses *after*.
+`adg lean verify --hook` re-runs validation (and `--root .` scope lint) and re-renders the brief —
+with its "Before you finish" footer (checks + named tests to run) — for the files changed this
+session (derived from git: working tree vs HEAD, plus untracked). It is **advisory and
+non-blocking**: output goes to stderr and it always exits 0, so it never prevents stopping.
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "adg lean verify --hook --model docs/decisions",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+What it proves and doesn't: re-running the index validates the **model and scope routing**, not that
+the edited code obeys the prose guidance — so the footer is a prompt to verify, not a proof of
+compliance. Code-level enforcement comes from executable `checks` (`adg lean check`) and CI. Blocking
+behavior is deliberately *not* wired here yet; the Stop hook only warns.

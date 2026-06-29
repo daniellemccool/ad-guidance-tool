@@ -60,5 +60,5 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Print(lean.Brief(records, changed))
+	fmt.Print(lean.Brief(records, changed, lean.BriefAuto))
 }

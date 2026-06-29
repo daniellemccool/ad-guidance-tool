@@ -10,6 +10,8 @@ Load the ADR(s) whose filename matches the area you are touching.
 - [0001 — Route matching is the single shared routing kernel](./0001-routematch-is-the-shared-routing-kernel.md)
 - [0002 — One canonical compiled lean renderer, shared by CLI, hook, CI, and tools](./0002-one-canonical-compiled-lean-renderer-shared-by-cli-hook-ci-and-tools.md)
 - [0003 — Stable commands run through the Clean Architecture stack](./0003-stable-commands-use-the-clean-architecture-stack.md)
+- [0010 — Executable checks are grep assertions, not commands](./0010-executable-checks-are-grep-assertions-not-commands.md)
+- [0011 — LLM review is the one Claude surface; the core stays deterministic](./0011-llm-review-is-the-one-claude-surface-the-core-stays-deterministic.md)
 
 ### ADR formats
 

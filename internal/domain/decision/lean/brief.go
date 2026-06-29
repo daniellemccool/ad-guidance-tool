@@ -7,19 +7,42 @@ import (
 	"strings"
 )
 
+// BriefMode selects how Brief renders the defaults it routes to.
+//
+//   - BriefFull always renders every governing ADR in full (scope/matched detail,
+//     Decision, full Guidance, inline companions) — the debuggable form.
+//   - BriefCompact keeps invariants and forbidden-path hits full but collapses each
+//     default to a one-line checklist item and aggregates companions once.
+//   - BriefAuto renders full, then re-renders defaults compact if the brief exceeds
+//     MaxBriefLines — so small briefs stay rich and hub files stay readable.
+type BriefMode int
+
+const (
+	BriefAuto BriefMode = iota
+	BriefFull
+	BriefCompact
+)
+
+// maxCompactSummary caps the one-line summary on a compact default entry. Some
+// Decisions collapse into a whole paragraph (layered-architecture rules especially);
+// truncating keeps a hub brief's checklist scannable.
+const maxCompactSummary = 200
+
+// briefHit is one record that routed into the brief, with its routing result.
+type briefHit struct {
+	rec   Record
+	route routeResult
+}
+
 // Brief compiles an agent-facing guidance packet for a set of changed paths: the
 // ADRs whose applies_to globs match (via the routeMatch kernel in route.go),
-// grouped by force (invariants first, then defaults), each reduced to its
-// Decision, Guidance bullets, and a traceability pointer back to the full record —
-// plus a consolidated list of any Checks. This is the deterministic core of
-// "before I touch this code, what rules constrain me?": pure path routing, no LLM,
-// suitable for a pre-edit hook or CI. Brief renders; route.go decides.
-func Brief(records []Record, changedPaths []string) string {
-	type hit struct {
-		rec   Record
-		route routeResult
-	}
-	var invariants, defaults []hit
+// grouped by force (invariants first, then defaults), plus a consolidated list of
+// any Checks. This is the deterministic core of "before I touch this code, what
+// rules constrain me?": pure path routing, no LLM, suitable for a pre-edit hook or
+// CI. mode controls how defaults render (see BriefMode). Brief renders; route.go
+// decides.
+func Brief(records []Record, changedPaths []string, mode BriefMode) string {
+	var invariants, defaults []briefHit
 	for _, r := range records {
 		route := routeMatch(r, changedPaths)
 		// A record enters the brief when it governs a changed path or when a
@@ -27,17 +50,35 @@ func Brief(records []Record, changedPaths []string) string {
 		if len(route.matched) == 0 && len(route.forbidden) == 0 {
 			continue
 		}
-		h := hit{rec: r, route: route}
+		h := briefHit{rec: r, route: route}
 		if strings.EqualFold(strings.TrimSpace(r.D.Priority), "invariant") {
 			invariants = append(invariants, h)
 		} else {
 			defaults = append(defaults, h)
 		}
 	}
-	byID := func(hs []hit) { sort.Slice(hs, func(i, j int) bool { return hs[i].rec.ID < hs[j].rec.ID }) }
+	byID := func(hs []briefHit) { sort.Slice(hs, func(i, j int) bool { return hs[i].rec.ID < hs[j].rec.ID }) }
 	byID(invariants)
 	byID(defaults)
 
+	switch mode {
+	case BriefFull:
+		return renderBrief(invariants, defaults, changedPaths, false)
+	case BriefCompact:
+		return renderBrief(invariants, defaults, changedPaths, true)
+	default: // BriefAuto: full unless it blows the one-screen budget.
+		full := renderBrief(invariants, defaults, changedPaths, false)
+		if briefLineCount(full) <= MaxBriefLines {
+			return full
+		}
+		return renderBrief(invariants, defaults, changedPaths, true)
+	}
+}
+
+// renderBrief writes the brief. With compactDefaults, each plain default collapses
+// to a checklist line and companions are aggregated once at the end; invariants and
+// forbidden-path hits always render in full.
+func renderBrief(invariants, defaults []briefHit, changedPaths []string, compactDefaults bool) string {
 	var b strings.Builder
 	b.WriteString("# Architecture brief\n\n")
 	fmt.Fprintf(&b, "Changed paths (%d):\n", len(changedPaths))
@@ -61,34 +102,96 @@ func Brief(records []Record, changedPaths []string) string {
 	if len(invariants) > 0 {
 		b.WriteString("\n## Hard constraints (invariants)\n\n")
 		for _, h := range invariants {
-			b.WriteString(briefEntry(h.rec, h.route, true))
+			b.WriteString(briefEntry(h.rec, h.route, true, !compactDefaults))
 		}
 	}
 	if len(defaults) > 0 {
-		b.WriteString("\n## Defaults & conventions\n\n")
+		if compactDefaults {
+			b.WriteString("\n## Defaults & conventions (condensed — open the record for full guidance)\n\n")
+		} else {
+			b.WriteString("\n## Defaults & conventions\n\n")
+		}
 		for _, h := range defaults {
-			b.WriteString(briefEntry(h.rec, h.route, false))
+			// A forbids violation is always rendered full, even for a default: a
+			// negative-space hit must stay prominent regardless of the line budget.
+			if compactDefaults && len(h.route.forbidden) == 0 {
+				b.WriteString(compactDefaultLine(h.rec))
+			} else {
+				b.WriteString(briefEntry(h.rec, h.route, false, !compactDefaults))
+			}
 		}
 	}
 
+	// In compact mode companions are pulled out of the per-entry rendering and
+	// listed once here as context, rather than repeated inside every entry.
+	if compactDefaults {
+		b.WriteString(relatedFilesSection(invariants, defaults))
+	}
+
+	// The post-edit half of the contract: what to run before finishing. Always
+	// present when the brief routed at all, so the hot path closes the loop.
+	b.WriteString(beforeYouFinish(append(append([]briefHit{}, invariants...), defaults...)))
+	return b.String()
+}
+
+// beforeYouFinish renders the post-edit action footer: re-run the model gate, the
+// matched ADRs' Checks, and the test files those ADRs name (via companions or
+// applies_to). It always tells the agent to re-run the index; the Checks and tests
+// lines appear only when the matched ADRs supply them.
+func beforeYouFinish(hits []briefHit) string {
 	var checks []string
-	for _, h := range append(append([]hit{}, invariants...), defaults...) {
+	testSet := map[string]bool{}
+	execChecks := 0
+	for _, h := range hits {
+		execChecks += len(h.rec.D.Checks)
 		if c, ok := ParseBody(h.rec.Body).Sections["checks"]; ok {
 			for _, line := range bulletLines(c) {
 				checks = append(checks, fmt.Sprintf("(ADR-%s) %s", h.rec.ID, line))
 			}
 		}
+		for _, pat := range append(append([]string{}, h.rec.D.AppliesTo...), h.rec.D.Companions...) {
+			if looksLikeTest(pat) {
+				testSet[pat] = true
+			}
+		}
+	}
+	tests := make([]string, 0, len(testSet))
+	for t := range testSet {
+		tests = append(tests, t)
+	}
+	sort.Strings(tests)
+
+	var b strings.Builder
+	b.WriteString("\n## Before you finish\n\n")
+	b.WriteString("- Re-run `adg lean index --root .` — this validates the model and scope routing, not that the code obeys the prose guidance above.\n")
+	if execChecks > 0 {
+		fmt.Fprintf(&b, "- Run `adg lean check` — %d executable check(s) on the matched ADRs.\n", execChecks)
 	}
 	if len(checks) > 0 {
-		b.WriteString("\n## Checks to run\n\n")
+		b.WriteString("- Review the matched ADR checks:\n")
 		for _, c := range checks {
-			fmt.Fprintf(&b, "- %s\n", c)
+			fmt.Fprintf(&b, "    - %s\n", c)
+		}
+	}
+	if len(tests) > 0 {
+		b.WriteString("- Run the tests these ADRs name:\n")
+		for _, t := range tests {
+			fmt.Fprintf(&b, "    - %s\n", t)
 		}
 	}
 	return b.String()
 }
 
-func briefEntry(r Record, route routeResult, includeWhy bool) string {
+// testPathRe matches a path/glob that looks like a test: a tests/ or test/ segment,
+// a test_ prefix, or a _test. / .test. / .spec. infix (Python, Go, JS conventions).
+var testPathRe = regexp.MustCompile(`(?i)(^|/)tests?/|(^|/)test_|_test\.|\.test\.|\.spec\.`)
+
+func looksLikeTest(pat string) bool { return testPathRe.MatchString(pat) }
+
+// briefEntry renders one full entry. includeWhy surfaces the Why (invariants only);
+// includeCompanions inlines the companion list (full mode) — compact mode passes
+// false and aggregates companions via relatedFilesSection instead.
+func briefEntry(r Record, route routeResult, includeWhy, includeCompanions bool) string {
 	p := ParseBody(r.Body)
 	guidance := guidanceSection(p)
 
@@ -128,7 +231,7 @@ func briefEntry(r Record, route routeResult, includeWhy bool) string {
 	// Companions are expected partner edits this ADR does not govern; list them so
 	// the agent considers them, with a soft note when the current change touches
 	// none of them.
-	if len(r.D.Companions) > 0 {
+	if includeCompanions && len(r.D.Companions) > 0 {
 		fmt.Fprintf(&b, "**Related files to consider:** %s\n", strings.Join(r.D.Companions, ", "))
 		if len(route.companionsHit) == 0 {
 			b.WriteString("_(none of the changed paths are among these — listed for context)_\n")
@@ -144,6 +247,77 @@ func briefEntry(r Record, route routeResult, includeWhy bool) string {
 	}
 	fmt.Fprintf(&b, "→ %s\n\n", r.Filename)
 	return b.String()
+}
+
+// compactDefaultLine collapses a default to one checklist item:
+// `- ADR-NNNN <title>: <summary> → <file>`. The summary prefers the first Guidance
+// bullet (the actionable rule) over the Decision, which can be a long paragraph;
+// it falls back to the Decision and is capped at maxCompactSummary.
+func compactDefaultLine(r Record) string {
+	p := ParseBody(r.Body)
+	summary := firstGuidanceBullet(p)
+	if summary == "" {
+		summary = oneLine(p.Sections["decision"])
+	}
+	summary = truncateRunes(summary, maxCompactSummary)
+	if summary == "" {
+		return fmt.Sprintf("- ADR-%s %s → %s\n", r.ID, p.Title, r.Filename)
+	}
+	return fmt.Sprintf("- ADR-%s %s: %s → %s\n", r.ID, p.Title, summary, r.Filename)
+}
+
+// relatedFilesSection aggregates the declared companions of every routed record
+// into a single section (compact mode). It returns "" when no routed record
+// declares a companion.
+func relatedFilesSection(groups ...[]briefHit) string {
+	var all []briefHit
+	for _, g := range groups {
+		all = append(all, g...)
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].rec.ID < all[j].rec.ID })
+
+	var lines strings.Builder
+	for _, h := range all {
+		if len(h.rec.D.Companions) > 0 {
+			fmt.Fprintf(&lines, "- ADR-%s: %s\n", h.rec.ID, strings.Join(h.rec.D.Companions, ", "))
+		}
+	}
+	if lines.Len() == 0 {
+		return ""
+	}
+	return "\n## Related files to consider\n\n" + lines.String()
+}
+
+// firstGuidanceBullet returns the first Guidance bullet (the leading actionable
+// rule), or "" when there is no Guidance section.
+func firstGuidanceBullet(p Parsed) string {
+	g := strings.TrimSpace(guidanceSection(p))
+	if g == "" {
+		return ""
+	}
+	lines := bulletLines(g)
+	if len(lines) == 0 {
+		return ""
+	}
+	return lines[0]
+}
+
+// truncateRunes trims s to at most max runes, appending an ellipsis when it cuts.
+func truncateRunes(s string, max int) string {
+	s = strings.TrimSpace(s)
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	if max <= 1 {
+		return string(r[:max])
+	}
+	return strings.TrimRight(string(r[:max-1]), " ") + "…"
+}
+
+// briefLineCount counts the rendered lines of a brief (for the BriefAuto budget).
+func briefLineCount(s string) int {
+	return strings.Count(s, "\n")
 }
 
 var briefBulletRe = regexp.MustCompile(`^\s*[-*]\s+(.*)$`)

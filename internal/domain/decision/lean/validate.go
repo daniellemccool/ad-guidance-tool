@@ -30,6 +30,10 @@ var (
 	statusRe       = regexp.MustCompile(`^(proposed|accepted|rejected|deprecated|superseded by ADR-\d{4}|amended by ADR-\d{4})$`)
 	supersededByRe = regexp.MustCompile(`^superseded by ADR-(\d{4})$`)
 	amendedByRe    = regexp.MustCompile(`^amended by ADR-(\d{4})$`)
+	// listItemRe matches a Markdown list item (-, *, +, or ordered "1.").
+	listItemRe = regexp.MustCompile(`(?m)^\s*([-*+]|\d+\.)\s+`)
+	// codeSpanRe matches an inline code span, so word counts ignore identifiers.
+	codeSpanRe = regexp.MustCompile("`[^`]*`")
 )
 
 // Validate runs lean-shape and integrity checks across a set of ADRs. Body
@@ -122,6 +126,29 @@ func validateOne(r Record, byID map[string]Record) []Issue {
 		warn("companions set but the record has no applies_to or forbids, so it never routes and the companions never surface")
 	}
 
+	// Executable checks: each must carry a compilable grep and a valid expect; a
+	// malformed check would silently never run, so these are hard issues.
+	for i, c := range r.D.Checks {
+		if strings.TrimSpace(c.Grep) == "" {
+			add(fmt.Sprintf("checks[%d] has no grep pattern", i))
+		} else if _, err := regexp.Compile(c.Grep); err != nil {
+			add(fmt.Sprintf("checks[%d] grep %q is not a valid regexp: %v", i, c.Grep, err))
+		}
+		switch strings.TrimSpace(c.Expect) {
+		case "", "absent", "present":
+		default:
+			add(fmt.Sprintf("checks[%d] expect %q is not valid (absent | present)", i, c.Expect))
+		}
+		if strings.TrimSpace(c.Desc) == "" {
+			warn(fmt.Sprintf("checks[%d] has no desc; add a human-readable statement of what it verifies", i))
+		}
+		for _, g := range append(append([]string{}, c.In...), c.Except...) {
+			if strings.ContainsAny(g, "{}") {
+				add(fmt.Sprintf("checks[%d] glob %q uses brace expansion, which is not supported; write separate globs", i, g))
+			}
+		}
+	}
+
 	p := ParseBody(r.Body)
 	if strings.TrimSpace(p.Title) == "" {
 		add("H1 title is missing or empty")
@@ -148,6 +175,28 @@ func validateOne(r Record, byID map[string]Record) []Issue {
 
 	if n := bodyLineCount(r.Body); n > MaxBodyLines {
 		warn(fmt.Sprintf("body is %d lines (> %d); a lean ADR should fit one screen — consider splitting", n, MaxBodyLines))
+	}
+
+	// Leanness nudges (advisory). They run on records still in force and skip
+	// sections that are empty or still hold scaffold placeholders, so a fresh draft
+	// is not nagged about content it has not written yet.
+	if leanLintEligible(status) {
+		if d, ok := filledSection(p, "decision"); ok {
+			if hasListItem(d) {
+				warn("Decision contains a list; a Decision is the rule in prose (1–3 sentences) — per-case detail belongs in Guidance")
+			}
+			if n := decisionWordCount(d); n > MaxDecisionWords {
+				warn(fmt.Sprintf("Decision is %d words (> %d); a lean Decision is the rule in 1–3 sentences — move detail to Guidance", n, MaxDecisionWords))
+			}
+		}
+		if g := strings.TrimSpace(guidanceSection(p)); g != "" && !containsPlaceholder(g) && !hasListItem(g) {
+			warn("Guidance has no list item; lead with reviewable bullets (the first bullet is what a compact brief renders)")
+		}
+		if strings.EqualFold(strings.TrimSpace(r.D.Priority), "invariant") {
+			if _, ok := filledSection(p, "why"); !ok {
+				warn("invariant has no Why; record the rationale (a real ## Why with content) that lets an agent reason about an override")
+			}
+		}
 	}
 
 	// Supersession integrity (forward + reverse), mirroring adg's MADR validator.
@@ -195,6 +244,46 @@ func validateOne(r Record, byID map[string]Record) []Issue {
 func sectionEmpty(p Parsed, key string) bool {
 	body, ok := p.Sections[key]
 	return !ok || strings.TrimSpace(body) == ""
+}
+
+// leanLintEligible reports whether the advisory leanness nudges apply. They are
+// authoring aids, so they run while a record is in force (unset/proposed/accepted/
+// amended) and are skipped on terminal records (rejected/deprecated/superseded),
+// whose body is frozen history not worth re-litigating.
+func leanLintEligible(status string) bool {
+	s := strings.TrimSpace(status)
+	if s == "rejected" || s == "deprecated" || supersededByRe.MatchString(s) {
+		return false
+	}
+	return true
+}
+
+// filledSection returns a section's trimmed content when it has real content to
+// lint — i.e. it is present, non-empty, and not still a scaffold placeholder.
+func filledSection(p Parsed, key string) (string, bool) {
+	s := strings.TrimSpace(p.Sections[key])
+	if s == "" || containsPlaceholder(s) {
+		return "", false
+	}
+	return s, true
+}
+
+// containsPlaceholder reports whether s still holds any template scaffolding token.
+func containsPlaceholder(s string) bool {
+	for _, tok := range PlaceholderTokens {
+		if strings.Contains(s, tok) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasListItem(s string) bool { return listItemRe.MatchString(s) }
+
+// decisionWordCount counts the words of a Decision, with inline code spans removed
+// so a rule that names several identifiers is not penalized for them.
+func decisionWordCount(s string) int {
+	return len(strings.Fields(codeSpanRe.ReplaceAllString(s, " ")))
 }
 
 // guidanceSection returns the Guidance section body, accepting the legacy

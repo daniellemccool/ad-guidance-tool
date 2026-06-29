@@ -1,62 +1,31 @@
 ---
 name: write-lean-adr
 description: >
-  Work with lean Architectural Decision Records — compact Decision/Guidance records
-  plus routing frontmatter (applies_to / excludes / forbids / companions, priority)
-  that `adg` compiles into per-file briefs and a PreToolUse hook. Covers both
-  authoring lean records and using them as active governance: run `adg lean brief` before
-  an edit, respect `forbids`, treat `companions` as non-governing related files, and
-  validate/route with `adg lean index`. Use in repos whose ADRs are lean (Decision +
-  Guidance with routing frontmatter), not full MADR. For durable MADR records with
-  Context / Considered Options / Decision Outcome and the decide / supersede / revise
-  loop, use the write-madr-adr skill instead.
+  Create, migrate, rewrite, or review lean Architectural Decision Records for the `adg`
+  model — compact Decision/Guidance records with routing frontmatter (applies_to /
+  excludes / forbids / companions, priority). Authoring only. For durable MADR records
+  (Context / Considered Options / Decision Outcome) use write-madr-adr; for obeying an
+  injected architecture brief while changing code, use follow-adr-governance.
 ---
 
-# write-lean-adr — author and consume lean decisions with `adg`
+# write-lean-adr — author lean decisions with `adg`
 
-A lean ADR is a one-screen record that answers, before an edit: *what rule governs
-this file, and how do I know if I've violated it?* The skill has two jobs:
+A lean ADR is a one-screen record optimized for the compiled brief: it answers, before an
+edit, *what rule governs this file, and how do I know if I've violated it?* This skill is for
+**authoring** — creating, migrating, rewriting, and reviewing the records. Obeying a brief
+while changing code is the **follow-adr-governance** skill; the PreToolUse hook and the brief
+do that at edit time.
 
-1. **Consume** — before changing code, compile the brief for the paths you're
-   touching so the governing ADRs are in context (the PreToolUse hook automates this).
-2. **Author** — write compact `Decision` + `Guidance` records with routing
-   frontmatter, validated by `adg lean index`.
-
-Full schema (body, frontmatter, glob rules, what each command enforces):
-`references/lean-format.md`.
+**Read `references/lean-rubric.md` before writing** — it is the standard a good lean record
+meets (Decision = one rule, the first Guidance bullet load-bearing, a prohibition expressed as
+`forbids`, scope narrowed to the enforcement points). Full format spec (frontmatter, glob
+rules, what each command enforces): `references/lean-format.md`.
 
 **Which model:** operate on the repo's *active* lean model — `docs/decisions/` unless it
 configures another (`adg set-config`). Other ADR-like files — a historical MADR record under
 `docs/fork-design/`, seed or template models — are **not** your model; don't route, validate, or
 author against them. Pick this skill vs write-madr-adr by the active model's format (lean
 Decision/Guidance + routing frontmatter), not by every `NNNN-*.md` in the tree.
-
-## Consume: governance before an edit
-
-```bash
-# Which rules govern these paths? Deterministic, no LLM.
-adg lean brief --model docs/decisions path/to/file.py another/file.py
-```
-
-- **applies_to** routes an ADR to the files it governs; the brief lists invariants
-  (hard constraints) before defaults.
-- **excludes** carves a sanctioned or out-of-scope path out of a broad `applies_to` —
-  the rule deliberately does not fire there.
-- **forbids** marks negative space. A brief showing **"⚠ Forbidden scope matched"**
-  means the edit touches a path the ADR says must not exist — treat it as a violation
-  to stop and reconsider, not as guidance to follow.
-- **companions** are expected partner edits the ADR does **not** govern (e.g. the TS
-  side of a prop). They appear as "related files to consider," never as a rule — make
-  the companion change, but don't treat the ADR as governing it.
-- **Routing is advisory.** "No brief appeared" never means "no rule applies": the hook
-  fires only on Claude edits and is fail-open. Real enforcement is `adg lean index` / CI /
-  review.
-
-### Pre-edit hook (recommended)
-
-`adg lean brief --hook` implements the Claude Code PreToolUse contract — it injects the
-brief for the file being edited as `additionalContext`, fail-open. Setup and the
-contract are documented with the tool (`docs/lean-prototype/hook-setup.md`).
 
 ## Author: a lean record
 
@@ -76,7 +45,13 @@ adg lean new --model docs/decisions \
 ```
 
 Pass `--from-stdin` to supply the body yourself; otherwise fill in the scaffolded
-Decision / Guidance / Why after it is written. The record it produces:
+Decision / Guidance / Why after it is written.
+
+**Migrating an existing ADR?** Pass `--date YYYY-MM-DD` to preserve its original decision
+date — otherwise the record is stamped with today's. The flag is intentionally hidden from
+`--help` (it backs migration and deterministic tests), but it is supported.
+
+The record it produces:
 
 ```markdown
 ---
@@ -112,20 +87,70 @@ One to three sentences: what was decided.
   `platforms/**/*.py`.
 - Keep it to one screen. If it runs longer, it is probably two ADRs.
 
+### Before you finish (lean self-check)
+
+Compact, high-leverage subset of `references/lean-rubric.md` — apply it before accepting:
+
+- [ ] **Decision** is the rule in 1–3 sentences of prose — no list, no per-case enumeration
+  (that belongs in Guidance).
+- [ ] **Guidance** leads with reviewable bullets, and the *first* bullet would still steer
+  the edit alone (it's what a compact brief renders).
+- [ ] **`applies_to`** names the few files that enforce the rule, not the whole neighborhood;
+  a pure prohibition is `forbids`-only (no `applies_to` re-describing the mechanism).
+- [ ] **`Why`** only for invariants; `invariant` means "must never be silently simplified or
+  breached," re-judged — not inherited from the source record.
+- [ ] Body names the **mechanism/file**, not the **ADR number** (numbers churn on renumber).
+- [ ] Behavioral rule? List its **test(s)** — as `companions` if they're partner edits, or in
+  `applies_to` if a test *is* the rule's enforcement. Add `## Checks` only for concrete
+  grep/verification targets not already implied by Guidance.
+
+`adg lean index` flags the mechanical subset of this (Decision-as-list / over-length,
+Guidance-without-a-bullet, invariant-without-`Why`) as advisory warnings.
+
+### Preview how it routes
+
+A record is consumed as a brief, so check it that way before accepting — especially for a
+likely **hub** file (one many ADRs already govern), where an over-broad `applies_to` or a
+weak first Guidance bullet shows up immediately:
+
+```bash
+adg lean brief --model docs/decisions <a file your ADR governs>   # see the compact rendering
+adg lean index --model docs/decisions --root . --overlaps         # is this ADR inflating a hub?
+```
+
+If the compact line doesn't steer the edit, tighten the first Guidance bullet or narrow the
+scope. (Obeying briefs at edit time is the follow-adr-governance skill — this is authoring QA.)
+
+For a judgment-level review against the full rubric, `adg lean review <adr-file>` (or
+`--since <ref>`) has Claude grade the record and return rubric-anchored fixes — default
+`claude-sonnet-4-6`, `--reviewer claude-opus-4-8` to escalate, `--fail-on-revise` to gate.
+
 ## Validate and index
 
 ```bash
-adg lean index --model docs/decisions            # validate + print the grouped README
-adg lean index --model docs/decisions --write    # write docs/decisions/README.md
-adg lean index --model docs/decisions --root .   # also scope-lint globs against the tree
+adg lean index --model docs/decisions                      # validate + print the grouped README
+adg lean index --model docs/decisions --write              # write docs/decisions/README.md
+adg lean index --model docs/decisions --root .             # also scope-lint globs against the tree
+adg lean index --model docs/decisions --root . --overlaps  # + opt-in scope-hub overlap diagnostic
 ```
 
 `adg lean index` hard-fails on a duplicate ID or a brace glob and warns on glob hygiene,
-over-length bodies, and (with `--root`) stale `applies_to`/`excludes`, `forbids` that
-now match a file, and default-vs-default scope overlap. Wire `adg lean index --root` into
-CI for real enforcement — the hook only routes; the index gates.
+over-length bodies, leanness nudges (Decision as a list or over-length, Guidance with no
+bullet, an invariant with no `Why` — see `references/lean-rubric.md`), and (with `--root`)
+stale `applies_to`/`excludes` and `forbids` that now match a file. The leanness warnings are
+advisory and skip terminal records and unfilled scaffold placeholders. Wire `adg lean index
+--root` into CI for real enforcement — the hook only routes; the index gates.
+
+**Default-vs-default overlap is opt-in**, not part of `--root`: overlap between defaults is
+usually benign, so it floods CI on a hub-heavy model. Pass `--overlaps` (grouped per-hub
+summary — *N files: M defaults apply: ADR-…*) or `--overlaps=pairs` (unaggregated per-pair
+detail) when auditing the model; both require `--root` and print an advisory `[info]` block,
+never a failure.
 
 ## Reference files
 
 - `references/lean-format.md` — the lean format spec: body, frontmatter, glob rules,
   and the "what enforces what" matrix.
+- `references/lean-rubric.md` — the authoring rubric: how to keep a record lean (Decision =
+  one rule, first-bullet-load-bearing, prohibition-as-`forbids`, scope-to-enforcement, …),
+  what the index warns on, and the standard `adg lean review` judges against.

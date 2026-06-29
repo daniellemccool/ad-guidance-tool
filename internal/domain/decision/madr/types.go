@@ -51,6 +51,21 @@ type Decision struct {
 	Excludes   []string
 	Forbids    []string
 	Companions []string
+	Checks     []Check
+}
+
+// Check is one executable lean-format check — a grep assertion that `adg lean check`
+// runs against the source tree. Grep is a regexp searched within the In globs (minus
+// Except); Expect is "absent" (the default — the check fails if Grep matches anywhere
+// in scope) or "present" (fails if it matches nowhere). Desc states, for a human,
+// what the check verifies. Commands are deliberately not supported — grep assertions
+// only (see the lean checks ADR).
+type Check struct {
+	Desc   string   `yaml:"desc"`
+	Grep   string   `yaml:"grep"`
+	In     []string `yaml:"in,omitempty"`
+	Except []string `yaml:"except,omitempty"`
+	Expect string   `yaml:"expect,omitempty"`
 }
 
 // Comment is one entry in the ADG-extension `comments` frontmatter list.
@@ -84,6 +99,7 @@ type Frontmatter struct {
 	Excludes       []string            `yaml:"excludes,omitempty"`
 	Forbids        []string            `yaml:"forbids,omitempty"`
 	Companions     []string            `yaml:"companions,omitempty"`
+	Checks         []Check             `yaml:"checks,omitempty"`
 }
 
 func (d Decision) Frontmatter() Frontmatter {
@@ -103,6 +119,7 @@ func (d Decision) Frontmatter() Frontmatter {
 		Amends:         d.Amends,
 		AppliesTo:      d.AppliesTo,
 		Priority:       d.Priority,
+		Checks:         d.Checks,
 		Excludes:       d.Excludes,
 		Forbids:        d.Forbids,
 		Companions:     d.Companions,
@@ -129,5 +146,6 @@ func DecisionFromFrontmatter(fm Frontmatter) Decision {
 		Excludes:       fm.Excludes,
 		Forbids:        fm.Forbids,
 		Companions:     fm.Companions,
+		Checks:         fm.Checks,
 	}
 }

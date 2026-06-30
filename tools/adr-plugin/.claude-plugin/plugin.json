@@ -1,7 +1,7 @@
 {
   "name": "write-adr",
-  "version": "1.1.0",
-  "description": "Architectural Decision Record skills for the adg CLI: write-madr-adr (durable MADR records), write-lean-adr (authoring lean records), and follow-adr-governance (obeying lean ADR briefs while changing code). Ships with ad-guidance-tool so the guidance tracks the tool's CLI in lockstep.",
+  "version": "1.2.0",
+  "description": "Architectural Decision Record skills for the adg CLI: write-madr-adr (durable MADR records), write-lean-adr (authoring lean records), and follow-adr-governance (obeying lean ADR briefs while changing code). Bundles a PreToolUse hook that injects the lean architecture brief at edit time, deduped per session (requires adg on PATH). Ships with ad-guidance-tool so the guidance tracks the tool's CLI in lockstep.",
   "author": {
     "name": "Danielle McCool"
   },

@@ -8,11 +8,15 @@ nothing and the edit proceeds.
 
 ## 1. Install adg
 
+These hooks invoke `adg` as a bare command, so it must be on your `PATH`. Install the prebuilt binary
+(no Go toolchain needed):
+
 ```
-go install .            # or: go build -o ~/.local/bin/adg .
+curl -fsSL https://raw.githubusercontent.com/daniellemccool/ad-guidance-tool/main/install.sh | sh
 ```
 
-`adg lean brief --hook` is the hook entry point (no separate binary needed).
+Or from source: `go install .` (or `go build -o ~/.local/bin/adg .`). `adg lean brief --hook` is the
+hook entry point — no separate binary needed.
 
 ## 2. Register the hook
 

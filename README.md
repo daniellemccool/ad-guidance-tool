@@ -36,7 +36,17 @@ The upstream tool managed a single custom-Markdown format with HTML anchor tags 
 
 ## Install
 
-Build from source:
+**Prebuilt binary (recommended).** Install the latest release into `~/.local/bin` — no Go toolchain:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/daniellemccool/ad-guidance-tool/main/install.sh | sh
+```
+
+Pin a version with `ADG_VERSION=v1.1.0` or change the location with `ADG_INSTALL_DIR`. Binaries for
+macOS/Linux/Windows (amd64/arm64) are on the
+[Releases](https://github.com/daniellemccool/ad-guidance-tool/releases) page.
+
+**From source** (needs Go 1.24+):
 
 ```sh
 git clone https://github.com/daniellemccool/ad-guidance-tool.git
@@ -45,8 +55,6 @@ go build           # produces ./adg
 # or:
 go install ./...   # installs to $GOBIN
 ```
-
-Go 1.24+ is required.
 
 ## Choosing a format
 

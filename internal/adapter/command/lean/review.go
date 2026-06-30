@@ -2,12 +2,10 @@ package lean
 
 import (
 	util "adg/internal/adapter/command"
-	"adg/internal/adapter/leanreview"
 	domain "adg/internal/domain/config"
 	leandomain "adg/internal/domain/decision/lean"
+	"adg/internal/domain/decision/madr"
 	"fmt"
-	"io"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -15,37 +13,32 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// defaultReviewModel is the model adg lean review uses unless --reviewer overrides it.
-// A rubric judge runs well (and cheaply) on Sonnet; escalate to opus for contentious
-// migrations or a release gate.
-const defaultReviewModel = "claude-sonnet-4-6"
-
-// NewReviewCommand wires `adg lean review`: an LLM judge of lean ADRs against the
-// authoring rubric. It is the one LLM surface; routing/brief/index/check stay
-// deterministic. Advisory by default (exit 0); --fail-on-revise gates.
+// NewReviewCommand wires `adg lean review`: it emits a deterministic *review packet*
+// — the target ADRs plus their lint findings — for a reviewer to judge against the
+// lean authoring rubric. The judging itself is not done here: `adg` makes no LLM
+// calls. A Claude Code subagent (the write-lean-adr skill drives this) reads the
+// packet and produces the verdict, using the session's own model access — no API key
+// (see ADR-0011).
+//
+// Targets: explicit ADR file paths, or --since <git-ref> (records changed since that
+// ref), or all records in the model when neither is given.
 func NewReviewCommand(config domain.ConfigService) *cobra.Command {
-	var modelPath, reviewer, since string
-	var failOnRevise bool
+	var modelPath, since string
 
 	cmd := &cobra.Command{
 		Use:   "review [adr-file...]",
-		Short: "LLM review of lean ADRs against the authoring rubric",
-		Long: `Review judges lean ADRs against the lean authoring rubric using Claude and prints a
-pass/revise verdict per ADR with specific, rubric-anchored findings. The default model is
-claude-sonnet-4-6; pass --reviewer to escalate (e.g. --reviewer claude-opus-4-8). Requires
-ANTHROPIC_API_KEY.
+		Short: "Emit a review packet (ADRs + findings) for a reviewer to judge against the rubric",
+		Long: `Review prints a deterministic review packet — each target ADR plus the lint
+findings already reported for it — for a reviewer to judge against the lean authoring
+rubric (references/lean-rubric.md). It does not call an LLM: the write-lean-adr skill
+has a Claude Code subagent read this packet and produce the verdict, using the session's
+own model access (no API key).
 
-Targets: explicit ADR file paths, or --since <git-ref> (records changed since that ref), or all
-records in the model when neither is given. Advisory by default (exit 0); --fail-on-revise exits
-non-zero if any ADR needs revision, for a release gate.`,
+Targets: explicit ADR file paths, or --since <git-ref> (records changed since that ref),
+or all records in the model when neither is given.`,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY")) == "" {
-				err := fmt.Errorf("ANTHROPIC_API_KEY is not set; `adg lean review` calls the Anthropic API")
-				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
-				return err
-			}
 			resolved, err := util.ResolveModelPathOrDefault(modelPath, config)
 			if err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
@@ -62,45 +55,72 @@ non-zero if any ADR needs revision, for a release gate.`,
 				return nil
 			}
 
-			// Per-ADR deterministic findings, passed to the model as context.
 			byID := map[string][]leandomain.Issue{}
 			for _, is := range leandomain.Validate(records) {
 				byID[is.ID] = append(byID[is.ID], is)
 			}
 
-			r := leanreview.NewReviewer(reviewer)
-			revise := 0
+			out := cmd.OutOrStdout()
+			fmt.Fprint(out, reviewPacketHeader(len(targets)))
 			for _, rec := range targets {
-				rv, rerr := r.ReviewOne(cmd.Context(), rec, byID[rec.ID])
-				if rerr != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "Error reviewing ADR-%s: %v\n", rec.ID, rerr)
-					continue
-				}
-				printReview(cmd.OutOrStdout(), rv)
-				if rv.Verdict == "revise" {
-					revise++
-				}
-			}
-			fmt.Fprintf(cmd.ErrOrStderr(), "\nreviewed %d ADR(s): %d need revision\n", len(targets), revise)
-			if failOnRevise && revise > 0 {
-				return ErrLeanValidationIssues
+				fmt.Fprint(out, reviewPacketEntry(rec, byID[rec.ID]))
 			}
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (optional if configured)")
-	cmd.Flags().StringVar(&reviewer, "reviewer", defaultReviewModel, "Claude model for the review (e.g. claude-opus-4-8 to escalate)")
 	cmd.Flags().StringVar(&since, "since", "", "Review only the ADR files changed since this git ref")
-	cmd.Flags().BoolVar(&failOnRevise, "fail-on-revise", false, "Exit non-zero if any ADR's verdict is \"revise\" (release gate)")
 	return cmd
 }
 
-func printReview(w io.Writer, rv leanreview.ADRReview) {
-	fmt.Fprintf(w, "ADR-%s — %s\n", rv.ADR, strings.ToUpper(rv.Verdict))
-	for _, f := range rv.Findings {
-		fmt.Fprintf(w, "  - [%s] %s: %s\n", f.Severity, f.RubricRule, f.SuggestedFix)
+func reviewPacketHeader(n int) string {
+	return fmt.Sprintf(`# Lean ADR review packet (%d record(s))
+
+Judge each ADR below against the lean authoring rubric (references/lean-rubric.md in the
+write-lean-adr skill). For each, return a verdict — pass | revise — and specific,
+rubric-anchored, actionable fixes; do not invent problems where the record is sound.
+Prefer a fresh-context subagent per ADR.
+
+`, n)
+}
+
+func reviewPacketEntry(rec leandomain.Record, findings []leandomain.Issue) string {
+	var b strings.Builder
+	p := leandomain.ParseBody(rec.Body)
+	fmt.Fprintf(&b, "## ADR-%s — %s\n\n", rec.ID, p.Title)
+	fmt.Fprintf(&b, "_%s_\n\n", reviewRoutingLine(rec.D))
+	b.WriteString(strings.TrimRight(rec.Body, "\n"))
+	b.WriteString("\n\nDeterministic findings already reported by the linter:\n")
+	if len(findings) == 0 {
+		b.WriteString("- none\n")
+	} else {
+		for _, f := range findings {
+			kind := "warn"
+			if !f.Warning {
+				kind = "FAIL"
+			}
+			fmt.Fprintf(&b, "- [%s] %s\n", kind, f.Message)
+		}
 	}
+	b.WriteString("\n")
+	return b.String()
+}
+
+func reviewRoutingLine(d madr.Decision) string {
+	parts := []string{"status: " + d.Status, "priority: " + d.Priority}
+	for _, kv := range []struct {
+		k string
+		v []string
+	}{
+		{"applies_to", d.AppliesTo}, {"excludes", d.Excludes},
+		{"forbids", d.Forbids}, {"companions", d.Companions},
+	} {
+		if len(kv.v) > 0 {
+			parts = append(parts, kv.k+": "+strings.Join(kv.v, ", "))
+		}
+	}
+	return strings.Join(parts, " · ")
 }
 
 // selectReviewTargets resolves which records to review: explicit ADR file paths, the

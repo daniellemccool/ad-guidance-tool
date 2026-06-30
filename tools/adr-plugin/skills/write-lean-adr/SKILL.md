@@ -121,9 +121,11 @@ adg lean index --model docs/decisions --root . --overlaps         # is this ADR 
 If the compact line doesn't steer the edit, tighten the first Guidance bullet or narrow the
 scope. (Obeying briefs at edit time is the follow-adr-governance skill — this is authoring QA.)
 
-For a judgment-level review against the full rubric, `adg lean review <adr-file>` (or
-`--since <ref>`) has Claude grade the record and return rubric-anchored fixes — default
-`claude-sonnet-4-6`, `--reviewer claude-opus-4-8` to escalate, `--fail-on-revise` to gate.
+For a judgment-level review against the full rubric, run `adg lean review <adr-file>` (or
+`--since <ref>`) — it emits a deterministic packet (the target ADRs + their lint findings).
+Then judge each against `references/lean-rubric.md` and report a **pass/revise** verdict with
+rubric-anchored fixes; prefer a fresh-context **subagent** per ADR. No API key — `adg` makes no
+LLM call, the review uses this session's model access (ADR-0011).
 
 ## Validate and index
 

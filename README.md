@@ -1,21 +1,38 @@
-# ADG (MADR-native fork)
+# ADG — Architectural Decision Guidance
 
-A command-line tool for managing **Architectural Decision Records (ADRs)** in [MADR 4.0](https://adr.github.io/madr/) format. ADRs are grouped into *models* (a directory of files), and the tool helps you create, edit, link, validate, and search them.
+A command-line tool for managing **Architectural Decision Records (ADRs)** and compiling them into
+architecture-context **briefs** that a coding agent reads before it edits. ADRs live in a *model* —
+a directory of `NNNN-slug.md` files — and `adg` creates, edits, validates, links, and searches them.
 
-This is a fork of [adr/ad-guidance-tool](https://github.com/adr/ad-guidance-tool) — see [Fork rationale](#fork-rationale) for what differs.
+`adg` speaks two record formats over one model directory:
+
+- **MADR** — durable decision records ([MADR 4.0](https://adr.github.io/madr/): Context / Considered
+  Options / Decision Outcome) with a `decide` / `supersede` / `revise` lifecycle. The archive:
+  *what was decided, and why.*
+- **Lean** — one-screen Decision/Guidance records with routing frontmatter (`applies_to`, `excludes`,
+  `forbids`, `companions`). The active constraint: *what rule governs my next edit, and how do I know
+  if I've violated it?* `adg` compiles the records that match a change into a brief and injects it at
+  edit time via a Claude Code hook.
+
+This is a fork of [adr/ad-guidance-tool](https://github.com/adr/ad-guidance-tool) — see
+[Fork rationale](#fork-rationale) for what differs.
 
 ## Fork rationale
 
-The upstream tool used a custom Markdown layout with HTML anchor tags and a sidecar `index.yaml`. This fork:
+The upstream tool managed a single custom-Markdown format with HTML anchor tags and a sidecar
+`index.yaml`. This fork made two moves:
 
-- **Adopts MADR 4.0 as the on-disk format.** Files look like ordinary MADR ADRs and round-trip through `parse → render`.
-- **Stores metadata in YAML frontmatter.** Tags, custom links, comments, supersession, and a `legacy-outcome` flag are first-class fields. The body is a projection of frontmatter for sections the tool regenerates (e.g. `## Comments`).
-- **Drops `index.yaml`.** ADR files are the only source of truth; `adg rebuild` is gone.
-- **Fixes the comment data-loss bug.** Upstream wrote a placeholder count where the comment text should be. Here, comment text is preserved verbatim in frontmatter and re-rendered into the body on every save.
-- **Rewrites `adg validate`** in MADR terms. New checks include MADR-section presence, status vocabulary, and bidirectional supersession integrity.
-- **Renames `adg view` section flags** to MADR vocabulary: `--context`, `--drivers`, `--options`, `--outcome`, `--comments`.
+1. **MADR on disk, no index.** Files are ordinary MADR records that round-trip through `parse →
+   render`; metadata (tags, custom links, comments, supersession) lives in YAML frontmatter; ADR files
+   are the only source of truth (`index.yaml` and `adg rebuild` are gone). The upstream comment
+   data-loss bug is fixed — comment text is preserved verbatim in frontmatter and re-rendered into the
+   body on every save. These departures are recorded in [`docs/fork-design/`](./docs/fork-design/) as a
+   self-hosted MADR model.
 
-Stdout/stderr split (machine values on stdout, status on stderr), `adg edit --from-stdin`, `adg supersede` as first-class, and `adg migrate` for legacy ADG → MADR conversion are tracked in follow-up PRs.
+2. **From ADR management to architecture-context compilation.** A second, *lean* format optimizes for
+   agent consumption: small Decision/Guidance records with glob-based routing that `adg` compiles into a
+   per-change brief and injects via a Claude Code hook. The tool's own current decisions live in
+   [`docs/decisions/`](./docs/decisions/) — themselves lean records.
 
 ## Install
 
@@ -29,11 +46,28 @@ go build           # produces ./adg
 go install ./...   # installs to $GOBIN
 ```
 
-Go 1.22+ is required.
+Go 1.24+ is required.
 
-## File format
+## Choosing a format
 
-Each ADR is `NNNN-slug.md` inside a model directory. Example:
+One model directory, one chronological `NNNN` sequence. Pick the format by what the record is *for*:
+
+| | MADR | Lean |
+|---|---|---|
+| **Purpose** | Durable record of a decision and its alternatives | Active rule consulted before an edit |
+| **Body** | Context / Considered Options / Decision Outcome | Decision / Guidance (+ optional Why, Checks) |
+| **Lifecycle** | `add` → `edit` → `decide` → `supersede` / `revise` | `lean new` → validate → route via the brief |
+| **Routing** | none | `applies_to` / `excludes` / `forbids` / `companions` globs |
+| **Consumed by** | humans, archaeology | the compiled brief + the PreToolUse hook |
+
+The two formats are deliberately separate user-facing surfaces, not implementation variants
+(see [ADR-0004](./docs/decisions/0004-madr-and-lean-are-separate-user-facing-formats.md)).
+
+---
+
+## MADR format
+
+Each ADR is `NNNN-slug.md` inside a model directory:
 
 ```markdown
 ---
@@ -47,11 +81,6 @@ tags: [data, infra]
 ## Context and Problem Statement
 
 What problem are we solving?
-
-## Decision Drivers
-
-* {driver 1}
-* {driver 2}
 
 ## Considered Options
 
@@ -68,90 +97,145 @@ Chosen option: "Option A", because reasons.
 * Bad, because ...
 ```
 
-After `adg comment`, the frontmatter grows a `comments:` list and a `## Comments` body section is regenerated from it. The `links:` map holds custom link tags; `supersedes:` lists predecessor IDs.
+After `adg comment`, the frontmatter grows a `comments:` list and a `## Comments` body section is
+regenerated from it. The `links:` map holds custom link tags; `supersedes:` lists predecessor IDs.
 
-## Command reference
+### Command reference
 
 | Command | Purpose |
 |---|---|
 | `init <model>` | Create a new model directory. |
-| `add --title <title> [--model <dir>]` | Create a new ADR with the next ID. Refuses titles that slugify to empty. |
-| `edit --id <id> [--context ... \| --drivers ... \| --option ...]` | Append to a section. |
-| `edit --id <id> --from-stdin\|--from-file <path> [--force]` | Replace the decision body. Status-gated: non-proposed decisions require `--force`. |
-| `comment --id <id> --author <name> --text <text>` | Append a comment. Text is preserved verbatim. |
-| `decide --id <id> --option <name-or-number> [--rationale <text>] [--force]` | Set status to accepted and write the MADR "Chosen option: ..." line. The option must already exist in Considered Options (use `edit --option` first to add new ones). `--force` bypasses two guards: re-deciding an already-accepted ADR, and overwriting a Decision Outcome that contains author-written content (including any nested `### Consequences`). |
-| `slug "<title>"` | Print the slug that `add` would produce for a title, without creating anything. Useful when plan briefs need to reference `NNNN-<slug>.md` filenames before the ADR exists. |
-| `link --source <id> --target <id> --tag <name> [--reverse-tag <name>]` | Add a custom link. Supersession has its own command — see below. |
-| `supersede --new <id> --old <id> [--rationale <text>]` | Mark `new` as superseding `old`. Bidirectional: writes `Supersedes` list on new and `superseded by ADR-N` status on old. Auto-promotes new to `accepted`. |
-| `migrate [--dry-run]` | Convert upstream ADG files (`AD\d{4}-slug.md` with HTML anchors and `status: open\|decided`) into MADR shape. In-place; idempotent. |
+| `add --title <title> [--id N] [--model <dir>]` | Create a new ADR with the next ID (or `--id`, which fails on collision). Refuses titles that slugify to empty. Prints the bare ID to stdout. |
+| `slug "<title>"` | Print the slug `add` would produce, without creating anything. |
+| `edit --id <id> --from-stdin\|--from-file <path> [--force]` | Replace the decision body. Status-gated: non-proposed decisions require `--force`. Append flags (`--context`/`--drivers`/`--option`) also exist for incremental edits. |
+| `decide --id <id> --option <name-or-number> [--rationale <text>] [--force]` | Set status to accepted and write the MADR "Chosen option: …" line. The option must already exist in Considered Options. `--force` bypasses two guards: re-deciding an accepted ADR, and overwriting an authored Decision Outcome (incl. a nested `### Consequences`). |
+| `comment --id <id> --text <text> [--author <name>]` | Append a comment; text preserved verbatim in frontmatter. |
+| `supersede --new <id> --old <id> [--rationale <text>]` | Mark `new` as superseding `old`. Bidirectional; auto-promotes `new` to accepted. |
+| `link --source <id> --target <id> --tag <name> [--reverse-tag <name>]` | Add a custom within-model link. |
+| `revise --id <id>` | Clone a decided ADR into a fresh proposed draft. |
 | `tag --id <id> --tag <name>` | Add a tag. |
-| `revise --id <id>` | Clone the decision into a new draft. |
 | `view --id <id> [--context\|--drivers\|--options\|--outcome\|--comments]` | Print full body or selected sections. |
 | `list [--filter ...]` | List decisions; `--format json\|yaml\|md\|simple`. |
 | `validate [--model <dir>]` | Check MADR shape, supersession integrity, comment text. |
-| `copy --model <src> --target <dst>` | Clone a model directory (filterable). |
-| `import --source <dir> --target <dir>` | Import filtered decisions into an existing model. |
-| `merge --model-a <a> --model-b <b> --target <dst>` | Combine two models into a fresh one. |
-| `set-config`, `reset-config` | Manage `.adgconfig.yaml`. |
+| `migrate [--dry-run]` | Convert upstream ADG files into MADR shape, in place (idempotent). |
+| `copy` / `import` / `merge` | Clone, import into, or combine model directories. |
+| `set-config` / `reset-config` | Manage `.adgconfig.yaml`. |
 
-Run `adg <command> -h` for full flag details.
+Run `adg <command> -h` for full flag details. For whole-body authoring, `edit --from-stdin` reads MADR
+markdown from stdin; the body must include the three required sections (Context and Problem Statement,
+Considered Options, Decision Outcome) or the command refuses.
 
-## LLM-friendly editing
+---
 
-For wholesale edits (e.g. an LLM rewrites a draft from scratch), use replace mode:
+## Lean format and governance
 
-```sh
-adg edit --id 0001 --from-stdin <<'EOF'
-# Renamed decision
+A lean record is one screen, optimized for the compiled brief. Required sections are `Decision` and
+`Guidance`; `Why` (expected for invariants) and `Checks` are optional. Routing lives in frontmatter:
 
-## Context and Problem Statement
+```markdown
+---
+status: accepted          # proposed | accepted | rejected | deprecated | superseded by ADR-NNNN | amended by ADR-NNNN
+category: Extraction      # groups the generated index (not the directory layout)
+priority: invariant       # invariant | default — force in the brief
+applies_to:
+    - port/**/*.py
+excludes:
+    - "**/port_helpers.py"
+---
 
-...
-EOF
+# Reject unsafe uploads before validation and extraction
+
+## Decision
+
+One to three sentences: what was decided.
+
+## Guidance
+
+- What new code must do, what review rejects, the fix path.
+
+## Why            # optional; expected for invariants
+## Checks         # optional; grep targets rolled up into the brief
 ```
 
-Rules:
+- A path is **governed** iff some `applies_to` glob matches it and no `excludes` glob does.
+- `forbids` is negative-space scope — paths that should *not* exist; it routes the brief like
+  `applies_to` but warns when it *does* match instead of when it's stale.
+- `companions` are expected partner edits (e.g. the TS side of a prop) that the ADR does **not**
+  govern; they surface in the brief as "related files," never routed on.
+- IDs are a flat global `NNNN` across the model; `category` (not a subfolder) groups the index.
+- Globs are forward-slash, repo-root-relative, doublestar (`**`). Brace globs `{a,b}` are rejected —
+  write one glob per alternative.
 
-- The body must parse as MADR and include the three required sections: `Context and Problem Statement`, `Considered Options`, `Decision Outcome`. Otherwise the command refuses and exits non-zero.
-- If the input has an `H1`, it overwrites the decision's title; the file is renamed on disk to match the new slug.
-- The `## Comments` section in the input is ignored — comments are frontmatter and are regenerated from there on every save.
-- A decision whose status is anything other than `proposed` requires `--force`. The intent: accepted/rejected/superseded ADRs are part of the historical record; replacing their body should be deliberate.
+### Command reference
 
-`--from-file <path>` reads the same content from a file instead of stdin.
+| Command | Purpose |
+|---|---|
+| `lean new --title <t> [--status …] [--priority …] [--category …] [--applies-to <glob>] [--excludes <glob>] [--from-stdin]` | Author a lean ADR. Validates the candidate and **refuses to write on a hard failure**, so an invalid record never lands on disk. Prints the new ID. |
+| `lean index [--write] [--root <tree>] [--overlaps]` | Validate the model and print/write the grouped README. `--root` scope-lints globs against the source tree (wire this into CI — the hook only routes, the index gates). `--overlaps` adds the opt-in default-vs-default hub diagnostic. |
+| `lean brief [--hook] <changed-path…>` | Compile the architecture brief for the changed paths: the ADRs that govern them, grouped by force, each with Decision + Guidance + consolidated checks. `--hook` is the PreToolUse entry point. |
+| `lean verify [--hook] [<changed-path…>]` | Re-validate the model and re-show the brief + its "Before you finish" footer for files changed this session. `--hook` is a Stop-hook entry point (advisory, non-blocking). |
+| `lean check [<changed-path…>]` | Run the executable grep-assertion checks declared in matched ADRs' `## Checks`. |
+| `lean review [<adr-file…>] [--since <ref>]` | Emit a deterministic review packet (target ADRs + lint findings) for a reviewer to judge against the rubric. `adg` makes no LLM call — review runs in a Claude Code subagent ([ADR-0011](./docs/decisions/0011-adg-makes-no-llm-calls-review-runs-in-a-subagent.md)). |
 
-The append flags (`--context`, `--drivers`, `--option`) still exist for incremental edits. Append and replace modes are mutually exclusive on a single invocation.
+### The brief, the hooks, and CI
+
+The same compiled-brief renderer drives the CLI, the hooks, and CI
+([ADR-0002](./docs/decisions/0002-one-canonical-compiled-lean-renderer-shared-by-every-consumer.md)):
+
+- **PreToolUse hook** (`adg lean brief --hook`) injects the brief for the file about to be edited as
+  `additionalContext` — only the governing ADRs, ~20–40 lines, not the whole corpus. It is **fail-open**:
+  no governing ADR (or any error) means it emits nothing and the edit proceeds.
+- **Stop hook** (`adg lean verify --hook`) re-runs the gate and re-shows the footer for changed files
+  after the agent stops — advisory, non-blocking.
+- **CI** runs `adg lean index --root .` for real enforcement (stale globs, duplicate IDs, brace globs,
+  leanness lints). The hook routes; the index gates.
+
+Setup, the exact hook JSON, and a worked example model live in
+[`docs/lean-example/hook-setup.md`](./docs/lean-example/hook-setup.md). Because the hook covers only
+Claude's `Edit`/`Write`/`MultiEdit` and is fail-open, **"no brief appeared" never means "no rule
+applies"** — comprehensive enforcement is CI / review / executable checks.
+
+---
+
+## Claude Code plugin (ADR skills)
+
+The [`write-adr`](./tools/adr-plugin/) plugin ships *with* `adg` so its guidance tracks the CLI in
+lockstep. It provides three skills — two for *authoring* (pick the one matching a repo's format) and one
+for *obeying* lean briefs while changing code:
+
+- **write-madr-adr** — author durable MADR records with the `decide` / `supersede` / `revise` lifecycle.
+- **write-lean-adr** — author/migrate/rewrite/review lean records with routing frontmatter.
+- **follow-adr-governance** — a behavior primer for obeying an injected lean brief while editing code
+  (the hook and the brief do the real work).
+
+```
+/plugin marketplace add daniellemccool/ad-guidance-tool
+```
+
+`adg` must be on `PATH` for the skills' commands to run. The plugin is also mirrored into the
+`d3i-skills` repo for distribution — this repo stays the canonical source.
+
+---
 
 ## Scripting (stdout / stderr / exit codes)
 
-`adg` follows the usual Unix conventions so it's safe to pipe and script:
+`adg` follows the usual Unix conventions, so it's safe to pipe and script:
 
-- **stdout** carries machine-readable values. `add` writes the new ID (one per line for multi-add); `revise` writes the new ID; `list` and `view` write their rendered output.
-- **stderr** carries human-readable status (`Decision X (0001) added successfully.`) and all errors.
-- **`--quiet`** (global flag) suppresses stderr status messages. Machine values on stdout still flow, and errors on stderr still print.
-
-That means:
+- **stdout** carries machine-readable values: `add` / `revise` / `lean new` write the new ID; `list`,
+  `view`, and `lean brief`/`index` write their rendered output.
+- **stderr** carries human-readable status and all errors.
+- **`--quiet`** (global) suppresses stderr status; machine values on stdout and errors on stderr still
+  print.
+- **Exit codes:** `0` on success; `1` on any failure including validation issues.
 
 ```sh
 ID=$(adg add --title "Bounded subprocess output")   # captures 0007
-adg --quiet add --title "X"                          # only the ID prints, nothing else
+adg --quiet add --title "X"                          # only the ID prints
 adg validate || echo "model has problems"            # exit 1 when issues exist
 ```
 
-**Exit codes:** `0` on success; `1` on any failure including validation issues. The validate command prints the issue list to stderr; if you only care about the exit code, redirect with `2>/dev/null`.
-
-## Validation rules
-
-`adg validate` reports per-decision issues across:
-
-1. Filename matches `NNNN-slug.md`.
-2. H1 title present.
-3. Required MADR sections present: `Context and Problem Statement`, `Considered Options`, `Decision Outcome`.
-4. `Considered Options` has at least one bullet.
-5. When status is `accepted` (and `legacy-outcome: false`), the Decision Outcome contains `Chosen option: "X"` with X appearing in Considered Options.
-6. Status matches MADR vocabulary: `proposed`, `rejected`, `accepted`, `deprecated`, or `superseded by ADR-NNNN`.
-7. Supersession forward integrity: `superseded by ADR-X` implies ADR-X exists and lists self in its `supersedes:`.
-8. Supersession reverse integrity: every `supersedes:` entry points to an ADR whose status references self.
-9. Comment text is non-empty and not purely numeric (defends against the legacy placeholder regression).
+This split is an invariant
+([ADR-0008](./docs/decisions/0008-route-machine-output-to-stdout-status-to-stderr.md)).
 
 ## Config
 
@@ -162,48 +246,51 @@ adg reset-config       # clear all values
 
 Config lives at `~/.adgconfig.yaml` by default; override with `--config-path`.
 
-## Fork design decisions
-
-The fork's own architectural decisions live in [`docs/fork-design/`](./docs/fork-design/) as a self-hosted MADR model. Each ADR documents a deliberate departure from the upstream tool: MADR-on-disk, no `index.yaml`, comments-in-frontmatter, stdout/stderr split, first-class supersede, replace-mode edit. Read them in order if you want the rationale behind everything in this fork.
-
 ## Migrating from upstream ADG
 
-If you have an existing model written by the upstream tool, `adg migrate` converts it in place:
+`adg migrate` converts an existing upstream model into MADR shape in place:
 
 ```sh
 adg migrate --model docs/decisions --dry-run    # preview only
 adg migrate --model docs/decisions               # rewrite
 ```
 
-What changes per file:
+It renames `AD0001-slug.md` → `0001-slug.md`, drops the `AD`-era frontmatter, strips HTML anchors,
+renames sections to MADR vocabulary, and recovers comment text into frontmatter (flagging any it can't
+pair). Migrate is faithful and idempotent — it doesn't synthesize sections the source lacked, so a
+legacy `status: open` ADR will report a missing Decision Outcome after migration by design.
 
-- Filename: `AD0001-slug.md` → `0001-slug.md` (drops the `AD` prefix).
-- Frontmatter: drops `adr_id`; drops the slug-style `title`; maps `status: open` → `proposed`, `status: decided` → `accepted` (with `legacy-outcome: true` to bypass the strict Chosen-option check); preserves `tags`, `links`, and `comments`.
-- Body: strips every `<a name="..."></a>` HTML anchor; renames `Question` → `Context and Problem Statement`, `Options` → `Considered Options` (numbered → bulletized), `Criteria` → `Decision Drivers`, `Outcome` → `Decision Outcome`; removes the `## Comments` H2 since comments are regenerated from frontmatter on every save.
-- Comments: best-effort recovery — the §A.1 bug stored placeholder indices in frontmatter while the real prose lived in body anchor blocks. Migrate pairs them by index and pulls the text into `Comments[N].Text`. If an entry can't be paired, a placeholder `(unrecoverable: legacy comment placeholder "N")` is written so `adg validate` flags it for manual repair.
+> **Heads up:** inline body links like `[ADR-0002](AD0002-foo.md)` break after migration because the
+> target filename changes. Grep your corpus for `AD\d{4}-` afterward if you used filename-based links.
 
-Migrate is faithful: it doesn't synthesize sections the source didn't have. Legacy ADRs in `status: open` had no `## Outcome` section, so after migration they'll report `missing required section: Decision Outcome` from `adg validate` — that's the design. Add the section by hand or via `adg edit --from-stdin`.
+## The tool's own decisions
 
-`adg migrate` is idempotent: running it again does nothing because already-migrated files don't match the legacy markers.
-
-> **Heads up:** inline body links like `[ADR-0002](AD0002-foo.md)` break after migration because the target filename changes. `adg migrate` doesn't rewrite link targets — grep your corpus for `AD\d{4}-` after migration if you used filename-based internal links.
+`adg` governs itself. Its current architectural decisions are lean records in
+[`docs/decisions/`](./docs/decisions/) (the routing kernel, the canonical renderer, MADR/lean
+separation, enforcement tiers, round-trip stability, relationship types, stdout/stderr, no-index, …).
+The earlier MADR-fork decisions are in [`docs/fork-design/`](./docs/fork-design/), and a worked lean
+example model is in [`docs/lean-example/`](./docs/lean-example/).
 
 ## Contributing
 
-The codebase follows Clean Architecture (domain → application → adapter → infrastructure). Tests use [testify](https://github.com/stretchr/testify) and [mockery](https://github.com/vektra/mockery). For changes:
+The codebase follows Clean Architecture (domain → application → adapter → infrastructure). Tests use
+[testify](https://github.com/stretchr/testify) and [mockery](https://github.com/vektra/mockery). For
+changes:
 
 1. Start with the use case (interactor) or domain logic.
-2. Add cobra command + presenter at the adapter layer.
+2. Add the cobra command + presenter at the adapter layer.
 3. Cover with unit tests; regenerate mocks if interfaces shift.
 4. Run `go test ./...` before pushing.
 
-Mocks under `mocks/` are generated by [mockery](https://github.com/vektra/mockery) v2.53.6 from the config at `.mockery.yaml`. Install with `env GOBIN="$HOME/.local/bin" go install github.com/vektra/mockery/v2@v2.53.6` and run `mockery` from the repo root to regenerate after any interface change.
-
-Open an issue or PR against this fork.
+Stable commands run through the full Clean Architecture stack
+([ADR-0003](./docs/decisions/0003-stable-commands-use-the-clean-architecture-stack.md)). Mocks under
+`mocks/` are generated by [mockery](https://github.com/vektra/mockery) v2.53.6 from `.mockery.yaml`:
+`env GOBIN="$HOME/.local/bin" go install github.com/vektra/mockery/v2@v2.53.6`, then run `mockery` from
+the repo root after any interface change.
 
 ## References
 
-- [MADR](https://adr.github.io/madr/) — the file format this fork adopts.
+- [MADR](https://adr.github.io/madr/) — the durable file format this fork adopts.
 - Upstream tool: [adr/ad-guidance-tool](https://github.com/adr/ad-guidance-tool).
 - Original theses behind the upstream tool:
   - [Concept Alternatives for the Management of Architectural Decisions in Clean Architectures](https://eprints.ost.ch/id/eprint/1280/1/MSECS-FS24-CleanArchitectureDecisionsConceptsRS.pdf)

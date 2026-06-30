@@ -6,11 +6,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Lean-format commands (prototype). Thin shells over the lean domain package;
-// see internal/adapter/command/lean for the promotion-to-full-stack note.
+// Lean-format commands. Thin shells over the lean domain package; see
+// internal/adapter/command/lean for the promotion-to-full-stack note (ADR-0003).
 //
-// All three live under the `lean` parent: `adg lean new` (author), `adg lean brief`
-// (consume), `adg lean index` (validate + generate). No top-level aliases.
+// All live under the `lean` parent, with no top-level aliases: `adg lean new`
+// (author), `adg lean brief` (compile the brief / PreToolUse hook), `adg lean
+// index` (validate + generate the README), `adg lean verify` (Stop-hook re-check),
+// `adg lean check` (executable grep assertions), and `adg lean review` (emit a
+// review packet for a reviewer to judge against the rubric).
 func init() {
 	leanCmd := &cobra.Command{
 		Use:   "lean",

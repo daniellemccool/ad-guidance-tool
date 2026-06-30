@@ -2,8 +2,9 @@
 
 This is a [Claude Code](https://code.claude.com) plugin that ships *with* `adg` so its
 guidance tracks the CLI in lockstep — the references in `skills/*/references/` are updated
-in the same change that updates the CLI, which is the whole reason they live here rather
-than in a separate skills repo.
+in the same change that updates the CLI, which is why this repo is the plugin's canonical
+home. The plugin is **also mirrored into the `d3i-skills` repo** for distribution there;
+this copy is the source of truth, so make changes here and sync them outward.
 
 It ships three skills — two for *authoring* (pick the one matching a repo's ADR format),
 and one for *obeying* lean briefs while changing code:

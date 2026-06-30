@@ -54,9 +54,10 @@ func isRegexMeta(c byte) bool {
 	return false
 }
 
-// MatchGlob reports whether path matches the doublestar glob pattern. An
-// invalid pattern matches nothing.
-func MatchGlob(pattern, path string) bool {
+// matchGlob reports whether path matches the doublestar glob pattern. An invalid
+// pattern matches nothing. It is a single-shot convenience around globToRegexp;
+// production routing compiles globs once per record (see route.go).
+func matchGlob(pattern, path string) bool {
 	re, err := regexp.Compile(globToRegexp(pattern))
 	if err != nil {
 		return false

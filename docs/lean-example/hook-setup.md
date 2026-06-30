@@ -50,7 +50,7 @@ session, feed it the same JSON Claude Code sends:
 
 ```
 printf '{"cwd":"%s","tool_name":"Edit","tool_input":{"file_path":"%s/port/helpers/flow_builder.py"}}' "$PWD" "$PWD" \
-  | adg lean brief --hook --model docs/lean-prototype
+  | adg lean brief --hook --model docs/lean-example
 ```
 
 A governed file prints a `hookSpecificOutput.additionalContext` JSON object; an ungoverned file

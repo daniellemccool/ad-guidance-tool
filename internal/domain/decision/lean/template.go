@@ -1,10 +1,11 @@
 // Package lean implements a streamlined, LLM-first ADR format as a parallel
 // alternative to the MADR shape in the madr package. A lean ADR is a one-screen
-// record with two core sections — Decision (what was decided) and Implication
-// (what the next contributor must do) — plus optional Why/Context/Alternatives
-// sections when load-bearing. Provenance, grouping, and supersession/amendment
-// relations live in machine-readable frontmatter (madr.Frontmatter), so the
-// generated index and the integrity checks stay automatable.
+// record with two core sections — Decision (what was decided) and Guidance (what
+// the next contributor must do; "Implication" is an accepted alias) — plus an
+// optional Why (expected for invariants) and Checks when load-bearing. Provenance,
+// grouping, and supersession/amendment relations live in machine-readable
+// frontmatter (madr.Frontmatter), so the generated index and the integrity checks
+// stay automatable.
 //
 // This package deliberately reuses madr for frontmatter, file splitting, and
 // filename parsing; only the body shape, validation rules, and index generation
@@ -35,11 +36,6 @@ const LeanBodyTemplate = `# %s
 
 {...}
 `
-
-// RenderNewBody emits the lean body scaffold for a freshly-created ADR.
-func RenderNewBody(title string) string {
-	return RenderNewBodyFor(title, "")
-}
 
 // RenderNewBodyFor emits the lean body scaffold, adding a `## Why` stub only for
 // invariants. Rationale is expected on an invariant (it is what lets an agent

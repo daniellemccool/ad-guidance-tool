@@ -39,7 +39,7 @@ func TestRenderNewBodyFor_WhyOnlyForInvariant(t *testing.T) {
 	if got := RenderNewBodyFor("T", "default"); strings.Contains(got, "## Why") {
 		t.Errorf("default scaffold should not include a Why stub:\n%s", got)
 	}
-	if got := RenderNewBody("T"); strings.Contains(got, "## Why") {
+	if got := RenderNewBodyFor("T", ""); strings.Contains(got, "## Why") {
 		t.Errorf("unprioritized scaffold should not include a Why stub:\n%s", got)
 	}
 }

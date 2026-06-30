@@ -26,7 +26,7 @@ type DecisionRepository interface {
 	LoadByTitle(modelPath, title string) (*Decision, error)
 
 	// LoadAll returns all Decisions in the model directory. Errors if any file
-	// uses the legacy ADG format (steers user to `adg migrate` in PR 4).
+	// uses the legacy ADG format (steers user to `adg migrate`).
 	LoadAll(modelPath string) ([]Decision, error)
 
 	// LoadBody returns the raw markdown body (no frontmatter, no ## Comments

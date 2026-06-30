@@ -60,6 +60,41 @@ printf '{"cwd":"%s","tool_name":"Edit","tool_input":{"file_path":"%s/port/helper
 A governed file prints a `hookSpecificOutput.additionalContext` JSON object; an ungoverned file
 prints nothing.
 
+## Golden path: the always-on convention
+
+The hook injects the brief at *edit* time — a safety net once the agent touches a governed file. But
+the higher-value moment is *planning*: the agent should pull the brief for the paths it expects to
+touch **before** it designs a change, so it doesn't commit to (say) a forbidden second pipeline and
+only get told at write time. Don't rely on the agent *auto-discovering* the `write-adr` skills to do
+this — skill auto-discovery on phrasings like "add an ADR" or "comply with our decisions" is
+unreliable in practice; the brief reaches the model dependably only through the hook (at edit time)
+and an always-loaded convention (at planning time).
+
+So put a short convention in the **consuming repo's `CLAUDE.md`**, which the agent reads every session:
+
+```markdown
+## Architecture decisions (adg)
+
+Working agreements live as lean ADRs in `docs/decisions/`, compiled into a brief.
+**Consult them while planning a change, not just at write time** — a PreToolUse hook injects the
+brief on edits, but pull it yourself *before* you design the change:
+
+    adg lean brief --model docs/decisions <paths you expect to touch>
+
+Treat the brief as constraints:
+- **Invariant** → a hard rule; read the full ADR before planning.
+- **Forbidden scope matched** → stop and surface the conflict; don't build it.
+- **Companions** → check whether the related files also need edits.
+- **No brief appeared** → never assume no rule applies.
+
+After editing, run `adg lean index --model docs/decisions --root .` and the tests.
+If the change establishes a reusable pattern, record it with `adg lean new`.
+```
+
+The two layers are complementary: the **convention** gets the agent to consult governance up front —
+it catches feature work like "create a new extractor," which the hook only sees once files are being
+written — and the **hook** is the backstop for edits the agent makes without consulting it first.
+
 ## Notes
 
 - **Advisory routing, not comprehensive enforcement.** This hook fires only on Claude's

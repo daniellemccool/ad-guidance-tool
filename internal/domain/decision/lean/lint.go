@@ -34,6 +34,10 @@ func LintTree(records []Record, root string) ([]Issue, error) {
 
 	var issues []Issue
 	for _, r := range records {
+		// A retired record's globs no longer route, so don't scope-lint them.
+		if !inForce(r.D.Status) {
+			continue
+		}
 		// Per-pattern syntax + existence checks. applies_to/excludes are stale when
 		// they match nothing; forbids inverts that (warn when it matches anything).
 		checkGlobs(r, "applies_to", r.D.AppliesTo, files, root, staleWhenEmpty, &issues)

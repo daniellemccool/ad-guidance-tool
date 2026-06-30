@@ -127,6 +127,16 @@ Then judge each against `references/lean-rubric.md` and report a **pass/revise**
 rubric-anchored fixes; prefer a fresh-context **subagent** per ADR. No API key — `adg` makes no
 LLM call, the review uses this session's model access (ADR-0011).
 
+### Retiring or superseding a record
+
+A record that merely *evolved* is usually best **edited in place** — a lean record is the rule
+*now*, and git carries what it used to say. Reach for supersession only when the change is a real
+replacement whose history matters: author the new record (it carries the routing), set the old
+one's `status: superseded by ADR-NNNN`, and add `supersedes: ["NNNN"]` to the new one — `adg lean
+index` checks both ends agree. A terminal status (`superseded`/`deprecated`/`rejected`) **retires
+the record from routing automatically** — it drops out of briefs and the hook, so you do not strip
+its globs; its body stays as history in the index.
+
 ## Validate and index
 
 ```bash

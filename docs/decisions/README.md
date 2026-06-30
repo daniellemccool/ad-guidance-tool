@@ -12,6 +12,7 @@ Load the ADR(s) whose filename matches the area you are touching.
 - [0003 — Stable commands run through the Clean Architecture stack](./0003-stable-commands-use-the-clean-architecture-stack.md)
 - [0010 — Executable checks are grep assertions, not commands](./0010-executable-checks-are-grep-assertions-not-commands.md)
 - [0011 — adg makes no LLM calls; ADR review runs in a Claude Code subagent](./0011-adg-makes-no-llm-calls-review-runs-in-a-subagent.md)
+- [0012 — Routing honors record lifecycle; terminal records govern nothing](./0012-routing-honors-record-lifecycle-terminal-records-govern-nothing.md)
 
 ### ADR formats
 

@@ -4,7 +4,10 @@ This wires the lean `brief` into Claude Code as a **PreToolUse** hook. Before th
 file, the hook compiles the brief for *that file* and injects it as `additionalContext` — so the
 ADRs governing the file are in context at edit time, at the cost of ~20–40 lines (the brief), not the
 whole ADR corpus. It is **fail-open**: if no ADR governs the file, or anything errors, the hook emits
-nothing and the edit proceeds.
+nothing and the edit proceeds. It **dedupes per session**: each ADR is injected at most once per
+Claude Code session (keyed by the payload's `session_id`), so repeated edits to broadly-scoped files
+don't re-pay for the same brief — a forbids violation always re-surfaces, and with no `session_id` it
+injects every time.
 
 ## 1. Install adg
 
@@ -19,6 +22,11 @@ Or from source: `go install .` (or `go build -o ~/.local/bin/adg .`). `adg lean 
 hook entry point — no separate binary needed.
 
 ## 2. Register the hook
+
+> **Using the `write-adr` plugin (v1.2.0+)?** Skip this step. The plugin bundles this exact
+> PreToolUse hook in `hooks/hooks.json`, so enabling the plugin registers it automatically — you
+> still need step 1 (system `adg` on `PATH`). The manual registration below is for repos that wire
+> the hook in directly without the plugin.
 
 In the target repo's `.claude/settings.json` (project scope), point `--model` at that repo's lean ADR
 directory:
@@ -120,6 +128,11 @@ with its "Before you finish" footer (checks + named tests to run) — for the fi
 session (derived from git: working tree vs HEAD, plus untracked). It is **advisory and
 non-blocking**: output goes to stderr and it always exits 0, so it never prevents stopping.
 
+> **Note:** the `write-adr` plugin does **not** bundle this Stop hook — it fires on every turn-end,
+> which is usually too frequent. The plugin bundles only the per-session-deduped PreToolUse hook. For
+> periodic enforcement, prefer the commit-time gate (next section) over a Stop hook. The snippet below
+> is for repos that still want the Stop re-check wired in manually.
+
 ```json
 {
   "hooks": {
@@ -142,3 +155,15 @@ What it proves and doesn't: re-running the index validates the **model and scope
 the edited code obeys the prose guidance — so the footer is a prompt to verify, not a proof of
 compliance. Code-level enforcement comes from executable `checks` (`adg lean check`) and CI. Blocking
 behavior is deliberately *not* wired here yet; the Stop hook only warns.
+
+## Commit-time enforcement gate (recommended)
+
+Enforcement belongs at commit time, not on every edit or every turn. The lean `pre-commit` template
+(`tools/adr-plugin/skills/write-lean-adr/assets/githooks/pre-commit`) runs once per commit:
+`adg lean index --root .` (validate the model — hard-fails on duplicate IDs or bad globs) and
+`adg lean check` on the staged files (the executable grep rules). It is **graceful**: if `adg` is not
+on `PATH` it warns and lets the commit through, so contributors without `adg` are never blocked — use
+CI for comprehensive enforcement.
+
+Install it directly (`cp …/pre-commit .git/hooks/pre-commit`) or, in a repo using Husky, drop the
+same logic into `.husky/pre-commit`. Override the model dir with `ADR_MODEL` (default `docs/decisions`).

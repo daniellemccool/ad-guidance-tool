@@ -166,3 +166,6 @@ never a failure.
 - `references/lean-rubric.md` — the authoring rubric: how to keep a record lean (Decision =
   one rule, first-bullet-load-bearing, prohibition-as-`forbids`, scope-to-enforcement, …),
   what the index warns on, and the standard `adg lean review` judges against.
+- `assets/githooks/pre-commit` — the commit-time enforcement gate: `adg lean index` +
+  `check` on staged files, once per commit (graceful when `adg` is absent). Install per-repo
+  (`.git/hooks/` or `.husky/pre-commit`); the edit-time hook is the safety net, this is the gate.

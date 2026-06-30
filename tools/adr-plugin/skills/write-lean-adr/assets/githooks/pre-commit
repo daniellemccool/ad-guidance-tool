@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# pre-commit — lean ADR commit-time gate. Enforcement belongs here (once per
+# commit), not on every edit. Validates the model and runs the executable checks
+# against the staged files; a failure aborts the commit.
+#
+# Install: cp this to .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+#   (or, in a Husky repo, put the same logic in .husky/pre-commit)
+# Model defaults to docs/decisions; override with ADR_MODEL.
+#
+# Graceful: if adg is not on PATH it warns and lets the commit through, so
+# contributors without adg are never blocked — use CI for comprehensive enforcement.
+set -euo pipefail
+MODEL="${ADR_MODEL:-docs/decisions}"
+
+[ -d "$MODEL" ] || exit 0
+if ! command -v adg >/dev/null 2>&1; then
+    echo "pre-commit: adg not installed, skipping ADR checks (see install.sh)" >&2
+    exit 0
+fi
+
+# gate runs a step quietly: on success its output (e.g. the generated index) is
+# discarded; on failure the captured output is surfaced and the commit aborts.
+gate() {
+    local out
+    if ! out=$("$@" 2>&1); then
+        printf '%s\n' "$out" >&2
+        exit 1
+    fi
+}
+
+# Validate the model: duplicate IDs / unsupported globs hard-fail and abort.
+gate adg lean index --model "$MODEL" --root .
+
+# Run the executable grep-assertion checks against the staged source files only.
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -n "$staged" ]; then
+    # shellcheck disable=SC2086
+    gate adg lean check --model "$MODEL" $staged
+fi

@@ -1,6 +1,24 @@
 package lean
 
-import "regexp"
+import (
+	"regexp"
+	"strings"
+)
+
+// inForce reports whether a record with this status still governs edits. Terminal
+// records — rejected, deprecated, or superseded — are frozen history: routeMatch
+// returns nothing for them, so they never appear in a brief or trip the hook, and
+// the scope lint and leanness nudges leave them alone. proposed, accepted, amended,
+// and unset records are in force. This is the single lifecycle gate; flipping a
+// record's status to a terminal value retires it from governance with no need to
+// strip its routing globs.
+func inForce(status string) bool {
+	s := strings.TrimSpace(status)
+	if s == "rejected" || s == "deprecated" || supersededByRe.MatchString(s) {
+		return false
+	}
+	return true
+}
 
 // This file is the routing kernel for the lean format: the one place that decides,
 // for a record and a set of changed paths, what the record governs. Brief (this
@@ -51,6 +69,10 @@ type routeResult struct {
 // record (not per path); an uncompilable glob is skipped — routing is fail-open,
 // and the validator and scope lint hard-fail bad globs at the gate instead.
 func routeMatch(r Record, changedPaths []string) routeResult {
+	// A retired record governs nothing — it is frozen history, not a live rule.
+	if !inForce(r.D.Status) {
+		return routeResult{}
+	}
 	applies := compileGlobs(r.D.AppliesTo)
 	excludes := compileGlobs(r.D.Excludes)
 	forbids := compileGlobs(r.D.Forbids)

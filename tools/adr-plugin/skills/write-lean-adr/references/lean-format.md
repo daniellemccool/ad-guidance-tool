@@ -50,6 +50,13 @@ IDs hard-fail `adg lean index`.
 
 All routing keys are `omitempty` — omit what you do not use.
 
+**Lifecycle gates routing.** A record routes only while it is *in force* — `proposed`,
+`accepted`, `amended by ADR-NNNN`, or unset. A **terminal** status — `rejected`, `deprecated`,
+or `superseded by ADR-NNNN` — retires it from all governance (briefs, the hook, scope lint, the
+leanness nudges) automatically; you do **not** strip its globs. To retire a rule, flip its
+status; the in-force replacement carries the routing, and the retired record keeps its body as
+history in the index README.
+
 ### Executable checks (`checks`)
 
 A `checks` entry is a **grep assertion** `adg lean check` runs against the tree — the

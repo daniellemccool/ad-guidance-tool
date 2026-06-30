@@ -180,7 +180,7 @@ func validateOne(r Record, byID map[string]Record) []Issue {
 	// Leanness nudges (advisory). They run on records still in force and skip
 	// sections that are empty or still hold scaffold placeholders, so a fresh draft
 	// is not nagged about content it has not written yet.
-	if leanLintEligible(status) {
+	if inForce(status) {
 		if d, ok := filledSection(p, "decision"); ok {
 			if hasListItem(d) {
 				warn("Decision contains a list; a Decision is the rule in prose (1–3 sentences) — per-case detail belongs in Guidance")
@@ -244,18 +244,6 @@ func validateOne(r Record, byID map[string]Record) []Issue {
 func sectionEmpty(p Parsed, key string) bool {
 	body, ok := p.Sections[key]
 	return !ok || strings.TrimSpace(body) == ""
-}
-
-// leanLintEligible reports whether the advisory leanness nudges apply. They are
-// authoring aids, so they run while a record is in force (unset/proposed/accepted/
-// amended) and are skipped on terminal records (rejected/deprecated/superseded),
-// whose body is frozen history not worth re-litigating.
-func leanLintEligible(status string) bool {
-	s := strings.TrimSpace(status)
-	if s == "rejected" || s == "deprecated" || supersededByRe.MatchString(s) {
-		return false
-	}
-	return true
 }
 
 // filledSection returns a section's trimmed content when it has real content to

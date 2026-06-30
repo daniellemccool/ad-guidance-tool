@@ -326,6 +326,41 @@ func TestBrief_FooterNamesTestsAndReRun(t *testing.T) {
 	}
 }
 
+func TestBrief_TerminalRecordsDoNotRoute(t *testing.T) {
+	rec := func(id, status string) Record {
+		return Record{ID: id, Filename: id + "-x.md",
+			D:    madr.Decision{Status: status, AppliesTo: []string{"port/**/*.py"}},
+			Body: "# Rule " + id + "\n\n## Decision\n\nx.\n\n## Guidance\n\n- y.\n"}
+	}
+	records := []Record{
+		rec("0001", "superseded by ADR-0004"),
+		rec("0002", "deprecated"),
+		rec("0003", "rejected"),
+		rec("0004", "accepted"), // the in-force replacement
+	}
+	out := Brief(records, []string{"port/x.py"}, BriefFull)
+	for _, gone := range []string{"ADR-0001", "ADR-0002", "ADR-0003"} {
+		if strings.Contains(out, gone) {
+			t.Errorf("terminal record %s must not route into the brief:\n%s", gone, out)
+		}
+	}
+	if !strings.Contains(out, "ADR-0004") {
+		t.Errorf("the in-force record should still route:\n%s", out)
+	}
+}
+
+func TestMatches_TerminalForbidsDoesNotTrigger(t *testing.T) {
+	r := Record{ID: "0001", Filename: "0001-x.md",
+		D: madr.Decision{Status: "superseded by ADR-0002", Forbids: []string{"port/legacy/**/*.py"}}}
+	if Matches([]Record{r}, []string{"port/legacy/new.py"}) {
+		t.Errorf("a superseded record's forbids must not trip the hook gate")
+	}
+	r.D.Status = "accepted"
+	if !Matches([]Record{r}, []string{"port/legacy/new.py"}) {
+		t.Errorf("an in-force forbids should trip the gate")
+	}
+}
+
 func TestMatches_ForbiddenTriggersGate(t *testing.T) {
 	r := briefRecX("0011", "0011-x.md", "invariant",
 		nil, nil, []string{"port/extraction/**/*.py"}, nil, "")

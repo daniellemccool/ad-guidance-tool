@@ -48,6 +48,10 @@ chmod +x .githooks/pre-commit
 git config core.hooksPath .githooks
 ```
 
+The pre-commit hook runs `adg` in git's hook context, outside Claude Code — so it needs a **system**
+`adg` on `PATH` (install it with the `curl … install.sh` one-liner from the main README), not just the
+plugin's bundled `bin/adg` wrapper.
+
 ## The authoring loop: add → edit → decide → validate
 
 ```bash
@@ -121,7 +125,8 @@ adg revise --id 0042 --model docs/decisions                                 # de
 `assets/scripts/adr` is a thin wrapper that hardcodes the model and takes positional args
 (`adr new`, `adr edit <id> < body`, `adr decide <id> <opt> [<r>] [--force]`). Install it
 per-repo for token savings; drop to bare `adg` for any flag it doesn't expose. It honours
-`ADR_MODEL` (default `docs/decisions`).
+`ADR_MODEL` (default `docs/decisions`). Like the git hook, it calls bare `adg`, so it needs a
+system `adg` on `PATH` (see the main README's install section).
 
 ## Reference files
 

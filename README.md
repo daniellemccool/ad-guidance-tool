@@ -180,7 +180,7 @@ One to three sentences: what was decided.
 ### The brief, the hooks, and CI
 
 The same compiled-brief renderer drives the CLI, the hooks, and CI
-([ADR-0002](./docs/decisions/0002-one-canonical-compiled-lean-renderer-shared-by-cli-hook-ci-and-tools.md)):
+([ADR-0002](./docs/decisions/0002-one-canonical-compiled-lean-renderer-shared-by-every-consumer.md)):
 
 - **PreToolUse hook** (`adg lean brief --hook`) injects the brief for the file about to be edited as
   `additionalContext` — only the governing ADRs, ~20–40 lines, not the whole corpus. It is **fail-open**:

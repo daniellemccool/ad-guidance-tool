@@ -12,7 +12,7 @@ applies_to:
 priority: invariant
 ---
 
-# One canonical compiled lean renderer, shared by CLI, hook, CI, and tools
+# One canonical compiled lean renderer shared by every consumer
 
 ## Decision
 
@@ -28,7 +28,7 @@ from the CLI, is forbidden.
   copy its logic into an adapter, a presenter, a tool, or the hook.
 - The deferred promotion of the lean commands onto the Clean Architecture stack must have its presenter
   delegate to this renderer, never reimplement formatting — this is the named thin-shell exception and
-  promotion path that ADR 0003 requires.
+  its promotion path.
 - A change to the renderer changes it for every consumer at once (by construction); never add a code
   path that renders for one consumer differently from another.
 

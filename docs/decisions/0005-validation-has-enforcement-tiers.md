@@ -16,20 +16,19 @@ applies_to:
 
 ## Decision
 
-Every validation check belongs to exactly one enforcement tier:
-
-1. **Hard failure** — a non-warning issue fails the CLI/CI (`adg lean index` / `adg validate` exit non-zero).
-2. **Warning** — advisory only; printed, never blocks (the `Issue.Warning` flag).
-3. **Fail-open** — the PreToolUse hook never blocks or errors an edit; it injects guidance or nothing.
+Every validation check is assigned exactly one enforcement tier — hard failure, warning, or fail-open —
+and the choice is deliberate, not incidental. The PreToolUse hook is always fail-open, regardless of any
+individual check's tier.
 
 ## Guidance
 
-- A new check must declare its tier. Make it a hard failure only if a malformed model should stop CI;
-  otherwise make it a warning (`Issue{Warning: true}`).
-- The hook path (`adg lean brief --hook` → `HookContext`) stays fail-open regardless of any check's tier —
-  never make the hook block an edit, even on a hard-failure-tier finding. Enforcement is CI's job.
-- `adg lean brief` (non-hook) may surface validation to stderr and exit non-zero on hard failures, but the
-  hook contract above is inviolate.
+- A new check must declare its tier: a **hard failure** (a non-warning `Issue` that exits `adg lean
+  index` / `adg validate` non-zero) only if a malformed model should stop CI; otherwise a **warning**
+  (`Issue{Warning: true}`, printed but never blocking).
+- The hook path (`adg lean brief --hook` → `HookContext`) is **fail-open**: it injects guidance or
+  nothing and never blocks or errors an edit, regardless of a check's tier — even a hard-failure-tier
+  finding. Enforcement is CI's job.
+- `adg lean brief` (non-hook) may surface validation to stderr and exit non-zero on hard failures.
 
 ## Why
 

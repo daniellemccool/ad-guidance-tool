@@ -264,8 +264,8 @@ func TestLoadDir_BrokenExampleFailsValidation(t *testing.T) {
 	}
 }
 
-func TestRenderNewBody_ContainsCoreSections(t *testing.T) {
-	body := RenderNewBody("Pick a thing")
+func TestRenderNewBodyFor_ContainsCoreSections(t *testing.T) {
+	body := RenderNewBodyFor("Pick a thing", "")
 	for _, want := range []string{"# Pick a thing", "## Decision", "## Guidance", "{...}"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("template missing %q:\n%s", want, body)

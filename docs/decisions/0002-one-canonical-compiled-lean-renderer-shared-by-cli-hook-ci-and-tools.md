@@ -18,8 +18,9 @@ priority: invariant
 
 There is exactly one compiled lean brief/index renderer — `lean.Brief`, `lean.RenderIndex`, and
 `lean.HookContext` in `internal/domain/decision/lean` — shared, unchanged, by every consumer: the `adg`
-CLI, the PreToolUse hook, CI, and the `leanbrief`/`leanindex` tools. Duplicating the renderer, or
-moving/refactoring it so the hook and CI would render differently from the CLI, is forbidden.
+CLI (the `adg lean` commands), the PreToolUse hook, CI, and any other tool that renders a lean brief or
+index. Duplicating the renderer, or moving/refactoring it so the hook and CI would render differently
+from the CLI, is forbidden.
 
 ## Guidance
 

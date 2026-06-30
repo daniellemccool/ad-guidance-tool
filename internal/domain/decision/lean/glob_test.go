@@ -31,8 +31,8 @@ func TestMatchGlob(t *testing.T) {
 		{"v?.py", "v10.py", false},
 	}
 	for _, c := range cases {
-		if got := MatchGlob(c.pattern, c.path); got != c.want {
-			t.Errorf("MatchGlob(%q, %q) = %v, want %v (regex %q)", c.pattern, c.path, got, c.want, globToRegexp(c.pattern))
+		if got := matchGlob(c.pattern, c.path); got != c.want {
+			t.Errorf("matchGlob(%q, %q) = %v, want %v (regex %q)", c.pattern, c.path, got, c.want, globToRegexp(c.pattern))
 		}
 	}
 }

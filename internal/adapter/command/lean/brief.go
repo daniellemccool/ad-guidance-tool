@@ -1,8 +1,10 @@
-// Package lean holds the cobra commands for the lean ADR format (brief, index).
-// These are intentionally thin shells over the internal/domain/decision/lean
-// package, which already returns finished output; they will be promoted to the
-// full inputport/interactor/presenter stack used by the MADR commands once the
-// lean format graduates from prototype.
+// Package lean holds the cobra commands for the lean ADR format (new, brief,
+// index, verify, check, review). These are intentionally thin shells over the
+// internal/domain/decision/lean package, which already returns finished output:
+// the thin-shell shortcut is the named, time-boxed exception ADR-0003 requires,
+// and ADR-0002 governs the deferred promotion onto the full inputport/interactor/
+// presenter stack — whose presenter must delegate to the shared renderer rather
+// than reimplement it.
 package lean
 
 import (

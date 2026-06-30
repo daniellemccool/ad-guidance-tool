@@ -22,12 +22,20 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+// version is the adg version string. It defaults to "dev" for source builds and
+// is overridden at release time via -ldflags "-X adg/cmd.version=<tag>" (wired by
+// .goreleaser.yaml). init() reads it into rootCmd.Version, so the value injected
+// at link time is what `adg --version` prints.
+var version = "dev"
+
 // Quiet is bound to the persistent --quiet flag. Presenters read it
 // through Streams.Quiet (pointer) so the parsed value is visible at
 // write time even though presenters are constructed during init().
 var Quiet bool
 
 func init() {
+	rootCmd.Version = version
+	rootCmd.SetVersionTemplate("adg {{.Version}}\n")
 	rootCmd.PersistentFlags().BoolVar(&Quiet, "quiet", false,
 		"Suppress success status messages on stderr; machine values on stdout and errors still print")
 }

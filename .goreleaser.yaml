@@ -1,0 +1,44 @@
+# goreleaser v2 — builds the adg CLI and publishes prebuilt binaries to GitHub
+# Releases on every `v*` tag (driven by .github/workflows/release.yml).
+#
+# The write-adr plugin's bin/adg wrapper and install.sh download these assets, so
+# the resulting asset names are a CONTRACT they depend on:
+#   adg_<os>_<arch>      (linux/darwin)   e.g. adg_darwin_arm64
+#   adg_<os>_<arch>.exe  (windows)        e.g. adg_windows_amd64.exe
+#   checksums.txt        (sha256 of every asset)
+version: 2
+
+project_name: adg
+
+builds:
+  - id: adg
+    binary: adg
+    main: .
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      # Inject the tag (without the leading v) as adg/cmd.version so `adg --version`
+      # matches plugin.json's version — the lock the wrapper relies on.
+      - -s -w -X adg/cmd.version={{ .Version }}
+
+archives:
+  - id: adg
+    # Raw binaries, not tar/zip: the downstream consumers are a bash wrapper and a
+    # curl|sh installer whose whole job is "fetch one file, verify, chmod, exec".
+    # Avoiding tar/unzip keeps them dependency-free (matters on Windows/Git-Bash).
+    formats: [binary]
+    name_template: "adg_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+release:
+  github:
+    owner: daniellemccool
+    name: ad-guidance-tool
+  draft: false
+  # Tags like v1.1.0-rc1 / v1.0.1-dev are published as prereleases automatically.
+  prerelease: auto

@@ -212,8 +212,11 @@ for *obeying* lean briefs while changing code:
 /plugin marketplace add daniellemccool/ad-guidance-tool
 ```
 
-`adg` must be on `PATH` for the skills' commands to run. The plugin is also mirrored into the
-`d3i-skills` repo for distribution — this repo stays the canonical source.
+The skills call `adg`, and it **rides along**: the plugin ships a `bin/adg` wrapper that Claude Code
+puts on `PATH` while the plugin is enabled, fetching the prebuilt CLI that matches the plugin's version
+on first use (no Go toolchain needed). The `d3i-skills` marketplace **lists** this plugin via a
+`git-subdir` source pinned to a release tag — a reference to this repo, which stays the canonical
+source. (Governed-repo hooks run outside the plugin's PATH and need a system `adg` — see [Install](#install).)
 
 ---
 

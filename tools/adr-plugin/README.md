@@ -3,8 +3,9 @@
 This is a [Claude Code](https://code.claude.com) plugin that ships *with* `adg` so its
 guidance tracks the CLI in lockstep — the references in `skills/*/references/` are updated
 in the same change that updates the CLI, which is why this repo is the plugin's canonical
-home. The plugin is **also mirrored into the `d3i-skills` repo** for distribution there;
-this copy is the source of truth, so make changes here and sync them outward.
+home. The `d3i-skills` marketplace **lists** this plugin via a `git-subdir` source pinned to a
+release tag — a reference to this repo, not a copy — so there is one source of truth and nothing
+to sync.
 
 It ships three skills — two for *authoring* (pick the one matching a repo's ADR format),
 and one for *obeying* lean briefs while changing code:
@@ -40,6 +41,10 @@ Either add this repo as a marketplace directly:
 ```
 
 …or install via a marketplace that references it with a `git-subdir` source pointing at
-`tools/adr-plugin`.
+`tools/adr-plugin` (this is how the `d3i-skills` marketplace lists it, pinned to a release tag).
 
-`adg` itself must be on `PATH` for the skill's commands to run.
+The skills call the `adg` CLI, and it **rides along**: the plugin ships a `bin/adg` wrapper that
+Claude Code puts on `PATH` while the plugin is enabled, and on first use it downloads the prebuilt
+`adg` matching the plugin's version — no Go toolchain, no manual install. (A system `adg` is needed
+only for the copied-out git hook and the governance hooks a target repo wires into its own settings —
+see the main README's install section.)

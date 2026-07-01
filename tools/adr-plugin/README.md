@@ -68,6 +68,11 @@ users). Every hook routes off the same compiled brief and needs system `adg` on 
   version this plugin ships for; when `adg` is missing or older, prints a note telling the agent to prompt
   the user to run `install.sh`. Silent when current. (The hooks shell out to the *system* `adg`, which can
   lag the plugin — this surfaces that instead of letting the hooks fail quietly.)
+- **UserPromptSubmit** (fires on every prompt; the script keyword-filters) → `bin/adr-router.sh`. When a
+  prompt mentions ADRs / `docs/decisions` / `adg`, injects a pointer telling the agent to do ADR work
+  through the write-adr skills + `adg` (author/migrate with `adg lean new`, review, or obey a brief via
+  follow-adr-governance) rather than reinventing it. This is the **deterministic** backstop for skill
+  auto-discovery, which is unreliable — a grep fires it, not the model's discretion. Silent otherwise.
 - **SessionStart** (matcher `^(startup|clear|compact)$`) → `adg lean brief --hook --whole`. Injects the
   **whole-corpus brief** — every in-force ADR, invariants full and defaults condensed — once at session
   start, so the working agreements are in context before the first prompt. (Not on `resume`: the earlier

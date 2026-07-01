@@ -78,6 +78,17 @@
         ]
       }
     ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh ${CLAUDE_PLUGIN_ROOT}/bin/adr-router.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "FileChanged": [
       {
         "matcher": "docs/decisions/[0-9][0-9][0-9][0-9]-*.md",

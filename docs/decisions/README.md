@@ -31,3 +31,7 @@ Load the ADR(s) whose filename matches the area you are touching.
 ### CLI conventions
 
 - [0008 — Commands route machine output to stdout, status to stderr](./0008-route-machine-output-to-stdout-status-to-stderr.md)
+
+### Release
+
+- [0013 — The marketplace tracks main, so a plugin.json version bump must ship with its tag and release](./0013-the-marketplace-tracks-main-so-a-plugin-json-version-bump-must-ship-with-its-tag-and-release.md)

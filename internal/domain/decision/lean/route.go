@@ -40,6 +40,19 @@ func Matches(records []Record, changedPaths []string) bool {
 	return false
 }
 
+// Forbidden returns the in-force records whose forbids globs at least one changed path
+// violates. It routes through routeMatch (the kernel), so the commit-time block uses the
+// same negative-space test as the brief and the hook gate rather than re-deriving it.
+func Forbidden(records []Record, changedPaths []string) []Record {
+	var out []Record
+	for _, r := range records {
+		if len(routeMatch(r, changedPaths).forbidden) > 0 {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 // routeResult is the outcome of routing one record against a set of changed
 // paths. It is the single source of routing truth — Brief, Matches, the hook, and
 // LintTree's overlap calc all derive from routeMatch, so routing semantics live in

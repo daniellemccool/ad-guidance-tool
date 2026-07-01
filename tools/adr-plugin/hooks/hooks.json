@@ -1,13 +1,80 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "^(startup|clear|compact)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "adg lean brief --hook --whole --model docs/decisions",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "^Plan$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "adg lean brief --hook --invariants --model docs/decisions",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit",
+        "matcher": "^(Edit|Write|MultiEdit|NotebookEdit)$",
         "hooks": [
           {
             "type": "command",
             "command": "adg lean brief --hook --model docs/decisions",
             "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "adg lean brief --hook --staged --model docs/decisions",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "^(Edit|Write|MultiEdit)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "adg lean brief --hook --guard --model docs/decisions",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "agent",
+            "if": "Bash(git commit *)",
+            "model": "claude-sonnet-5",
+            "timeout": 120,
+            "prompt": "A git commit is about to run. Assess whether the STAGED changes COMPLY with the lean ADRs governing the touched files — judge whether the code obeys the ADRs, not the ADRs' own quality. Run `git diff --cached --name-only` for the staged files, then `adg lean brief --model docs/decisions <those files>` for the ADRs that govern them (Decision/Guidance/forbids), and `git diff --cached` for the actual changes; for each governing ADR, decide whether the diff obeys its guidance. Report PASS, or a concise list of violations (ADR id · file · what's wrong · fix). Do not edit files; this is an advisory assessment."
+          }
+        ]
+      }
+    ],
+    "FileChanged": [
+      {
+        "matcher": "docs/decisions/[0-9][0-9][0-9][0-9]-*.md",
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "A lean ADR record under docs/decisions/ just changed on disk (the changed path is in your hook input; if unsure, check `git status --porcelain docs/decisions`). Review that record: run `adg lean review <changed file> --model docs/decisions`, read the lean authoring rubric it names, and judge the record against it. Report a pass/revise verdict with specific, rubric-anchored fixes. Do not edit files."
           }
         ]
       }

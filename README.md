@@ -190,18 +190,20 @@ One to three sentences: what was decided.
 The same compiled-brief renderer drives the CLI, the hooks, and CI
 ([ADR-0002](./docs/decisions/0002-one-canonical-compiled-lean-renderer-shared-by-every-consumer.md)):
 
-- **PreToolUse hook** (`adg lean brief --hook`) injects the brief for the file about to be edited as
-  `additionalContext` — only the governing ADRs, ~20–40 lines, not the whole corpus. It is **fail-open**:
-  no governing ADR (or any error) means it emits nothing and the edit proceeds.
-- **Stop hook** (`adg lean verify --hook`) re-runs the gate and re-shows the footer for changed files
-  after the agent stops — advisory, non-blocking.
-- **CI** runs `adg lean index --root .` for real enforcement (stale globs, duplicate IDs, brace globs,
-  leanness lints). The hook routes; the index gates.
+The `write-adr` plugin bundles a suite of **fail-open** hooks that route the brief across the change
+lifecycle — the whole-corpus brief at `SessionStart`, invariants at `Plan`-subagent dispatch, the deduped
+file-scoped brief before an edit, a staged-file brief before a commit — plus a **guard** that blocks
+hand-creating an ADR record and two **agent** reviewers (code-vs-ADR compliance at commit, ADR-quality on
+record change). Only two hard stops exist: a commit that stages a `forbids` violation, and hand-creating a
+record; everything else advises.
 
-Setup, the exact hook JSON, and a worked example model live in
-[`docs/lean-example/hook-setup.md`](./docs/lean-example/hook-setup.md). Because the hook covers only
-Claude's `Edit`/`Write`/`MultiEdit` and is fail-open, **"no brief appeared" never means "no rule
-applies"** — comprehensive enforcement is CI / review / executable checks.
+- **CI** runs `adg lean index --root .` for real enforcement (stale globs, duplicate IDs, brace globs,
+  leanness lints). The hooks route and advise; the index gates.
+
+The full suite, the exact hook JSON, and a worked example model live in
+[`docs/lean-example/hook-setup.md`](./docs/lean-example/hook-setup.md). Because the hooks fire only on
+Claude's tool calls and are fail-open, **"no brief appeared" never means "no rule applies"** —
+comprehensive enforcement is CI / review / executable checks.
 
 ---
 

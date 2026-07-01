@@ -11,8 +11,14 @@ import (
 	util "adg/internal/adapter/command"
 	domain "adg/internal/domain/config"
 	leandomain "adg/internal/domain/decision/lean"
+	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -22,7 +28,7 @@ import (
 // --hook it runs as a Claude Code PreToolUse hook over stdin.
 func NewBriefCommand(config domain.ConfigService) *cobra.Command {
 	var modelPath string
-	var hook, full, compact bool
+	var hook, full, compact, whole, invariants, staged, guard bool
 
 	cmd := &cobra.Command{
 		Use:   "brief [changed-path...]",
@@ -43,10 +49,15 @@ exceed one screen the defaults collapse to a one-line checklist (invariants and
 forbidden-path hits always stay full). --full forces every entry full with scope
 detail (the debuggable form); --compact forces the condensed form.
 
-With --hook it runs as a Claude Code PreToolUse hook: it reads the hook JSON on
-stdin and injects the brief for the edited file as additionalContext. Hook mode is
-fail-open — any error injects nothing and never blocks the edit. Hook mode always
-uses auto rendering; --full/--compact are invalid with --hook.`,
+With --hook it runs as a Claude Code hook reading the hook JSON on stdin. By default
+(PreToolUse on an edit) it injects the brief for the edited file as additionalContext.
+--whole injects the whole-corpus brief (SessionStart); --invariants injects the
+invariants-only brief (SubagentStart); --staged briefs the staged files on a git commit
+Bash call, blocking only on a forbidden-scope hit; --guard blocks hand-creating an ADR
+record (a Write of a new NNNN-*.md under the model) and warns on editing one. Hook mode
+is fail-open on errors — a malformed payload or missing model injects nothing; only
+--staged (forbidden scope) and --guard (hand-created record) ever block. It always uses
+auto rendering, so --full/--compact are invalid with --hook.`,
 		SilenceErrors: true, // issues already printed to stderr
 		SilenceUsage:  true, // failure is data, not user error
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -56,7 +67,17 @@ uses auto rendering; --full/--compact are invalid with --hook.`,
 					fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 					return err
 				}
-				return runHook(cmd, modelPath, config)
+				if boolCount(whole, invariants, staged, guard) > 1 {
+					err := fmt.Errorf("--whole, --invariants, --staged, and --guard are mutually exclusive")
+					fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
+					return err
+				}
+				return runHook(cmd, modelPath, config, whole, invariants, staged, guard)
+			}
+			if whole || invariants || staged || guard {
+				err := fmt.Errorf("--whole/--invariants/--staged/--guard require --hook")
+				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
+				return err
 			}
 
 			mode := leandomain.BriefAuto
@@ -94,7 +115,11 @@ uses auto rendering; --full/--compact are invalid with --hook.`,
 	}
 
 	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (optional if configured)")
-	cmd.Flags().BoolVar(&hook, "hook", false, "Claude Code PreToolUse hook mode: read hook JSON from stdin and inject the brief for the edited file")
+	cmd.Flags().BoolVar(&hook, "hook", false, "Claude Code hook mode: read hook JSON from stdin and inject the brief (default: the edited file, PreToolUse)")
+	cmd.Flags().BoolVar(&whole, "whole", false, "Hook mode (SessionStart): inject the whole-corpus brief — every in-force ADR, once per session")
+	cmd.Flags().BoolVar(&invariants, "invariants", false, "Hook mode (SubagentStart): inject the invariants-only brief")
+	cmd.Flags().BoolVar(&staged, "staged", false, "Hook mode (PreToolUse on `git commit`): brief the staged files; block only on a forbidden-scope hit")
+	cmd.Flags().BoolVar(&guard, "guard", false, "Hook mode (PreToolUse on Write/Edit): guard the ADR model — block hand-creating a record, warn on editing one")
 	cmd.Flags().BoolVar(&full, "full", false, "Render every governing ADR in full, with scope/matched detail (debuggable)")
 	cmd.Flags().BoolVar(&compact, "compact", false, "Render defaults as a one-line checklist; invariants and forbidden-path hits stay full")
 	cmd.MarkFlagsMutuallyExclusive("full", "compact")
@@ -103,12 +128,11 @@ uses auto rendering; --full/--compact are invalid with --hook.`,
 
 // runHook is fully fail-open: a misconfigured model, an empty directory, or a
 // malformed payload all inject nothing and exit 0, so the hook never breaks an edit.
-func runHook(cmd *cobra.Command, modelPath string, config domain.ConfigService) error {
+// The mode flags select which brief the hook injects: --whole (SessionStart), --invariants
+// (SubagentStart), --staged (commit-time advisory), or the default file-scoped brief
+// (PreToolUse on an edit). Rendering and routing stay in the domain (ADR-0002/0001).
+func runHook(cmd *cobra.Command, modelPath string, config domain.ConfigService, whole, invariants, staged, guard bool) error {
 	resolved, err := util.ResolveModelPathOrDefault(modelPath, config)
-	if err != nil {
-		return nil
-	}
-	records, err := leandomain.LoadDir(resolved)
 	if err != nil {
 		return nil
 	}
@@ -116,10 +140,127 @@ func runHook(cmd *cobra.Command, modelPath string, config domain.ConfigService) 
 	if err != nil {
 		return nil
 	}
-	if out := leandomain.HookContext(records, payload); out != "" {
+	// The guard decides from the payload and the path alone; it never reads the records.
+	if guard {
+		if out := modelGuard(payload, resolved); out != "" {
+			fmt.Fprintln(cmd.OutOrStdout(), out)
+		}
+		return nil
+	}
+	records, err := leandomain.LoadDir(resolved)
+	if err != nil {
+		return nil
+	}
+	var out string
+	switch {
+	case whole:
+		out = leandomain.SessionBrief(records, payload)
+	case invariants:
+		out = leandomain.SubagentBrief(records, payload)
+	case staged:
+		out = stagedAdvisory(records, payload)
+	default:
+		out = leandomain.HookContext(records, payload)
+	}
+	if out != "" {
 		fmt.Fprintln(cmd.OutOrStdout(), out)
 	}
 	return nil
+}
+
+// boolCount returns how many of the flags are set — used to reject conflicting hook modes.
+func boolCount(bs ...bool) int {
+	n := 0
+	for _, b := range bs {
+		if b {
+			n++
+		}
+	}
+	return n
+}
+
+// gitCommitRe detects a `git commit` invocation in a Bash command, mirroring Claude
+// Code's own detection so the advisor fires on exactly the commands that commit.
+var gitCommitRe = regexp.MustCompile(`\bgit\s+commit\b`)
+
+// stagedAdvisory is the commit-time advisor: on a `git commit` Bash call it routes the
+// staged files to the ADRs and returns the brief (or a block on a forbidden-scope hit,
+// per CommitAdvisory). Fully fail-open — any parse or git error injects nothing and
+// never blocks the commit. It is a thin git-plumbing shell; routing and rendering stay
+// in the domain (leandomain.CommitAdvisory).
+func stagedAdvisory(records []leandomain.Record, payload []byte) string {
+	var in struct {
+		CWD       string `json:"cwd"`
+		ToolInput struct {
+			Command string `json:"command"`
+		} `json:"tool_input"`
+	}
+	if err := json.Unmarshal(payload, &in); err != nil {
+		return ""
+	}
+	if !gitCommitRe.MatchString(in.ToolInput.Command) {
+		return ""
+	}
+	staged := stagedFiles(in.CWD)
+	if len(staged) == 0 {
+		return ""
+	}
+	return leandomain.CommitAdvisory(records, staged)
+}
+
+// modelGuard is the ADR-model guard: on a Write/Edit whose target is a lean ADR record
+// directly under the model dir, it blocks a hand-authored *new* record (Write to a
+// not-yet-existing NNNN-*.md) and warns on an *edit* to an existing one. It is a thin
+// path/existence shell; the deny/advisory decision is CommitAdvisory's sibling in the
+// domain (leandomain.ModelGuard). Fail-open: a non-record path or any parse error yields
+// nothing. It does not dedup.
+func modelGuard(payload []byte, modelPath string) string {
+	var in struct {
+		CWD       string `json:"cwd"`
+		ToolName  string `json:"tool_name"`
+		ToolInput struct {
+			FilePath string `json:"file_path"`
+		} `json:"tool_input"`
+	}
+	if err := json.Unmarshal(payload, &in); err != nil {
+		return ""
+	}
+	file := strings.TrimSpace(in.ToolInput.FilePath)
+	if file == "" {
+		return ""
+	}
+	absModel := modelPath
+	if !filepath.IsAbs(absModel) && in.CWD != "" {
+		absModel = filepath.Join(in.CWD, absModel)
+	}
+	rel, err := filepath.Rel(absModel, file)
+	// Records are flat NNNN-*.md directly in the model dir: reject "../" (outside) and
+	// any nested path (a separator in rel).
+	if err != nil || strings.HasPrefix(rel, "..") || strings.ContainsRune(rel, filepath.Separator) {
+		return ""
+	}
+	_, statErr := os.Stat(file)
+	return leandomain.ModelGuard(in.ToolName, leandomain.IsRecordFile(filepath.Base(file)), statErr == nil)
+}
+
+// stagedFiles returns the staged (added/copied/modified) paths in dir, or nil on any
+// error — the advisor stays fail-open and never blocks a commit on a git hiccup.
+func stagedFiles(dir string) []string {
+	c := exec.Command("git", "diff", "--cached", "--name-only", "--diff-filter=ACM")
+	if dir != "" {
+		c.Dir = dir
+	}
+	out, err := c.Output()
+	if err != nil {
+		return nil
+	}
+	var files []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if s := strings.TrimSpace(line); s != "" {
+			files = append(files, s)
+		}
+	}
+	return files
 }
 
 // reportLeanIssues prints validation issues to w in the same [FAIL]/[warn] form as

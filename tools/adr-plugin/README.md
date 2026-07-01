@@ -49,32 +49,59 @@ Claude Code puts on `PATH` while the plugin is enabled, and on first use it down
 
 A **system `adg` on `PATH`** is still needed for any `adg` invocation that runs *outside* the skills'
 execution context: the copied-out git hook, governance hooks a target repo wires into its own
-settings, and — as of v1.2.0 — **this plugin's own bundled hooks** (`hooks/hooks.json`, below).
+settings, and — as of v1.3.0 — **this plugin's own bundled hooks** (`hooks/hooks.json`, below).
 Install it once with the prebuilt binary:
 
 ```
 curl -fsSL https://raw.githubusercontent.com/daniellemccool/ad-guidance-tool/main/install.sh | sh
 ```
 
-## Bundled hook
+## Bundled hooks
 
-As of **v1.2.0** the plugin ships `hooks/hooks.json` with one fail-open governance hook, so enabling
-the plugin registers it automatically — a repo no longer needs the manual `.claude/settings.json`
-snippet from `docs/lean-example/hook-setup.md` (it remains for non-plugin users):
+As of **v1.3.0** the plugin ships `hooks/hooks.json` with a suite of fail-open governance hooks, so
+enabling the plugin registers them automatically — a repo no longer needs the manual
+`.claude/settings.json` snippets from `docs/lean-example/hook-setup.md` (they remain for non-plugin
+users). Every hook routes off the same compiled brief and needs system `adg` on `PATH` plus a
+`docs/decisions` lean model:
 
-- **PreToolUse** (matcher `Edit|Write|MultiEdit`) → `adg lean brief --hook --model docs/decisions`.
-  Injects the governing lean ADRs as context *before* each edit, **deduped per session**: each ADR is
-  injected at most once per Claude Code session (keyed by `session_id`), so repeated edits to
-  broadly-scoped files don't re-pay for the same brief. A forbids violation always re-surfaces.
+- **SessionStart** (matcher `^(startup|clear|compact)$`) → `adg lean brief --hook --whole`. Injects the
+  **whole-corpus brief** — every in-force ADR, invariants full and defaults condensed — once at session
+  start, so the working agreements are in context before the first prompt. (Not on `resume`: the earlier
+  injection is already restored.)
+- **SubagentStart** (matcher `^Plan$`) → `adg lean brief --hook --invariants`. Injects the **invariants**
+  into a `Plan` subagent as it starts designing a change. The dispatch payload carries no paths, so this
+  is the always-relevant floor, not a file-scoped brief.
+- **PreToolUse** (matcher `^(Edit|Write|MultiEdit|NotebookEdit)$`) → `adg lean brief --hook`. Injects the
+  governing ADRs for the file *about to be edited*, **deduped per session** (each ADR at most once per
+  session; a forbids violation always re-surfaces).
+- **PreToolUse** (matcher `^Bash$`) → `adg lean brief --hook --staged`. The *deterministic* commit layer:
+  on a `git commit` call, briefs the **staged** files and **blocks the commit** (`permissionDecision:
+  deny`) when a staged path hits a `forbids` glob — a deliberate block
+  ([ADR-0005](../../docs/decisions/0005-validation-has-enforcement-tiers.md)).
+- **PreToolUse** (matcher `^Bash$`, `if: "Bash(git commit *)"`) → a **`type: agent`** hook: the
+  *code-compliance* reviewer (distinct from the ADR-quality reviewer below). Before a commit lands, it
+  assesses whether the **staged diff obeys** the ADRs governing the touched files (`git diff --cached` +
+  `adg lean brief`) and reports violations. **Advisory** — the deterministic `forbids` block above is the
+  only hard stop. Pinned to Sonnet; the commit pauses while it reviews (`if` keeps it off every Bash call).
+- **PreToolUse** (matcher `^(Edit|Write|MultiEdit)$`) → `adg lean brief --hook --guard`. Guards the ADR
+  model itself: **blocks** a hand-authored *new* record (a `Write` to a not-yet-existing `NNNN-*.md`) so
+  records go through `adg lean new`, and **warns** (advisory, no block) on an *edit* to an existing record
+  so the write-lean-adr revise/review flow isn't deadlocked. Not deduped.
+- **FileChanged** (matcher `docs/decisions/[0-9][0-9][0-9][0-9]-*.md`) → a **`type: agent`** hook that runs
+  the ADR review agent (`adg lean review` + the lean rubric) when a record changes *on disk* — the backstop
+  for changes made **outside** Claude's Edit/Write (an external editor, git, tooling). ⚠️ **Experimental:**
+  the file watcher appears to be interactive-only (it did not fire in headless `-p` runs) and the matcher
+  glob support was not verified — confirm it in a live session via `/hooks` before relying on it.
 
-It is **fail-open**: it needs system `adg` on `PATH` and a `docs/decisions` lean model in the repo;
-absent either, it emits nothing and the edit proceeds — so "no brief appeared" never means "no rule
-applies."
+The injection hooks are **fail-open**: no system `adg`, no lean model, or any error means nothing is
+injected and the edit proceeds — so "no brief appeared" never means "no rule applies." The two blocking
+hooks (commit `forbids`, ADR-record creation) are the deliberate exceptions.
 
-The hook is the *edit-time safety net*; it is deliberately not the whole story. The brief earns most
-of its value at **planning time** — pull it yourself with `adg lean brief` before designing a change
-(see the "Golden path" convention in `docs/lean-example/hook-setup.md`, meant for a consuming repo's
-`CLAUDE.md`). **Enforcement** belongs at **commit time**, not on every turn: install the lean
-`pre-commit` gate (`skills/write-lean-adr/assets/githooks/pre-commit`) to run `adg lean index` +
-`check` once per commit. The authoring-side review phase is *not* a hook either — it is driven by the
-`write-lean-adr` skill, which has a subagent judge `adg lean review` output against the rubric.
+Together these cover the lifecycle: **SessionStart/SubagentStart** put the rules in view at *planning*
+time, **PreToolUse** is the *edit-time* safety net, and the **commit advisor** is the last gate before a
+change lands. The always-loaded `CLAUDE.md` convention (the "Golden path" in
+`docs/lean-example/hook-setup.md`) is now complementary rather than the only planning-time channel.
+**Comprehensive enforcement** still belongs at **commit time / CI**: install the lean `pre-commit` gate
+(`skills/write-lean-adr/assets/githooks/pre-commit`) to run `adg lean index` + `check` once per commit.
+The authoring-side review phase is *not* a hook either — it is driven by the `write-lean-adr` skill,
+which has a subagent judge `adg lean review` output against the rubric.

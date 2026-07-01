@@ -18,7 +18,7 @@ enforcement-points — see the companion `lean-rubric.md`.
 | `# <title>` (H1) | yes | The decision as a statement. |
 | `## Decision` | yes | 1–3 sentences: what was decided. |
 | `## Guidance` | yes | What the next contributor must do — what new code must do, what review rejects, the fix path. (`## Implication` is an accepted alias.) |
-| `## Why` | optional | Rationale. Expected for invariants — it is what lets an agent reason about an override instead of silently "simplifying" the rule. |
+| `## Why` | required (accepted) | The reasoning: why the rule exists / what it protects, so a reader can generalize. Required once accepted; invariants center it on what breaks if breached. **Record-only — never rendered into a brief.** |
 | `## Checks` | optional | Concrete things to confirm (grep targets, invariants). Rolled up into the brief's "Checks to run". |
 | `## Context` / `## Alternatives` | optional | Only when load-bearing. |
 
@@ -37,7 +37,7 @@ IDs hard-fail `adg lean index`.
 |---|---|---|---|
 | `status` | string | `proposed` \| `accepted` \| `rejected` \| `deprecated` \| `superseded by ADR-NNNN` \| `amended by ADR-NNNN` | Lifecycle. Accepted records are validated as finished. |
 | `category` | string | free text | Index grouping. |
-| `priority` | string | `invariant` \| `default` (or unset) | Force in the brief: invariants are hard constraints, surfaced with their `Why`. |
+| `priority` | string | `invariant` \| `default` (or unset) | Force in the brief: invariants render in full (Decision + Guidance), defaults may condense. The `Why` is record-only and never injected. |
 | `applies_to` | []glob | repo-root-relative | Routes the ADR to changed files. |
 | `excludes` | []glob | repo-root-relative | Carves paths out of `applies_to`: a path is governed iff some `applies_to` matches **and** no `excludes` does. Use for a rule's sanctioned home or out-of-scope subpaths. |
 | `forbids` | []glob | repo-root-relative | Negative-space scope — paths that should not exist. Routes the brief as a **violation** when matched, is exempt from the stale lint, and warns when it matches a real file. |
@@ -97,7 +97,7 @@ Routing is **advisory**; enforcement is the index/lint/checks layer. "No brief a
 |---|---|---|
 | `adg lean brief --hook` (PreToolUse) | advisory, **fail-open** | Injects the matching ADRs for the edited file (auto rendering — defaults condense on a hub file). Fires only on Claude `Edit`/`Write`/`MultiEdit`; misses shell/formatter/human/other-agent edits. |
 | `adg lean brief <paths>` | advisory, **fail-closed on a bad model** | Compiles the brief (auto; `--full`/`--compact` to force a mode); also runs validation and prints issues (e.g. a brace glob) to stderr, exiting non-zero on a hard failure. |
-| `adg lean index` | **hard gate** | Duplicate ID and brace glob (hard); glob-hygiene, over-length body, missing category, and leanness nudges — Decision-as-list / over-length, Guidance-without-a-bullet, invariant-without-`Why` (warn; advisory, skipped on terminal records and scaffold placeholders — see `lean-rubric.md`); status vocabulary and supersede/amend integrity. |
+| `adg lean index` | **hard gate** | Duplicate ID and brace glob (hard); an accepted record missing a required section — Decision, Guidance, or `## Why` (hard); glob-hygiene, over-length body, missing category, and leanness nudges — Decision-as-list / over-length, Guidance-without-a-bullet (warn; advisory, skipped on terminal records and scaffold placeholders — see `lean-rubric.md`); status vocabulary and supersede/amend integrity. |
 | `adg lean index --root <tree>` | **hard gate + scope lint** | All of the above, plus: stale `applies_to`/`excludes` (match nothing) and `forbids` that now matches a file. |
 | `adg lean index --root <tree> --overlaps[=pairs]` | advisory **diagnostic** (opt-in) | Default-vs-default scope overlap (computed on `applies_to` minus `excludes`), as an `[info]` block — grouped per-hub summary, or `=pairs` for per-pair detail. Never a failure; off by default because benign overlap floods CI. |
 | `adg lean check [paths]` | **hard gate** (code-level) | Runs the frontmatter `checks` (grep assertions) against the tree; a failed assertion exits non-zero. With paths, searches only those files ("check what changed"). |

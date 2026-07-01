@@ -151,7 +151,7 @@ func renderCorpus(invariants, defaults []briefHit, includeDefaults bool) string 
 	if len(invariants) > 0 {
 		b.WriteString("## Hard constraints (invariants)\n\n")
 		for _, h := range invariants {
-			b.WriteString(briefEntry(h.rec, h.route, true, false))
+			b.WriteString(briefEntry(h.rec, h.route, false))
 		}
 	}
 	if includeDefaults && len(defaults) > 0 {
@@ -185,7 +185,7 @@ func renderBrief(invariants, defaults []briefHit, compactDefaults bool) string {
 	if len(invariants) > 0 {
 		b.WriteString("\n## Hard constraints (invariants)\n\n")
 		for _, h := range invariants {
-			b.WriteString(briefEntry(h.rec, h.route, true, !compactDefaults))
+			b.WriteString(briefEntry(h.rec, h.route, !compactDefaults))
 		}
 	}
 	if len(defaults) > 0 {
@@ -200,7 +200,7 @@ func renderBrief(invariants, defaults []briefHit, compactDefaults bool) string {
 			if compactDefaults && len(h.route.forbidden) == 0 {
 				b.WriteString(compactDefaultLine(h.rec))
 			} else {
-				b.WriteString(briefEntry(h.rec, h.route, false, !compactDefaults))
+				b.WriteString(briefEntry(h.rec, h.route, !compactDefaults))
 			}
 		}
 	}
@@ -271,10 +271,11 @@ var testPathRe = regexp.MustCompile(`(?i)(^|/)tests?/|(^|/)test_|_test\.|\.test\
 
 func looksLikeTest(pat string) bool { return testPathRe.MatchString(pat) }
 
-// briefEntry renders one full entry. includeWhy surfaces the Why (invariants only);
-// includeCompanions inlines the companion list (full mode) — compact mode passes
-// false and aggregates companions via relatedFilesSection instead.
-func briefEntry(r Record, route routeResult, includeWhy, includeCompanions bool) string {
+// briefEntry renders one full entry. includeCompanions inlines the companion list
+// (full mode) — compact mode passes false and aggregates companions via
+// relatedFilesSection instead. Why is never rendered: it is record-only, read from
+// the file by a human or a deliberate LLM, never injected into a brief.
+func briefEntry(r Record, route routeResult, includeCompanions bool) string {
 	p := ParseBody(r.Body)
 	guidance := guidanceSection(p)
 
@@ -325,13 +326,6 @@ func briefEntry(r Record, route routeResult, includeWhy, includeCompanions bool)
 			b.WriteString("_(none of the changed paths are among these — listed for context)_\n")
 		}
 		b.WriteString("\n")
-	}
-	// Rationale is what lets an agent avoid unsafe "simplifications" of an
-	// invariant, so surface Why for invariants (only) when present.
-	if includeWhy {
-		if why := strings.TrimSpace(p.Sections["why"]); why != "" {
-			fmt.Fprintf(&b, "**Why:** %s\n\n", oneLine(why))
-		}
 	}
 	fmt.Fprintf(&b, "→ %s\n\n", r.Filename)
 	return b.String()

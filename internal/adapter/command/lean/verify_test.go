@@ -30,7 +30,7 @@ func writeADR(t *testing.T, dir, name, content string) {
 func TestLeanVerify_ExplicitPathsRendersFooter(t *testing.T) {
 	dir := t.TempDir()
 	writeADR(t, dir, "0001-test-rule.md",
-		"---\nstatus: accepted\ncategory: Test\napplies_to:\n    - port/**/*.py\n---\n\n# Test rule\n\n## Decision\n\nWe do X.\n\n## Guidance\n\n- Do Y.\n")
+		"---\nstatus: accepted\ncategory: Test\napplies_to:\n    - port/**/*.py\n---\n\n# Test rule\n\n## Decision\n\nWe do X.\n\n## Guidance\n\n- Do Y.\n\n## Why\n\nWithout it, later code can't tell a valid change from an invalid one.\n")
 
 	// --root "" skips scope lint (the temp dir is not the tree being checked).
 	out, _, err := runVerify(t, dir, "", "--root", "", "port/x.py")

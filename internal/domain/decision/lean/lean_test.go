@@ -16,7 +16,7 @@ func rec(id, filename, status, category string, body string, supersedes, amends 
 }
 
 func acceptedBody(title string) string {
-	return "# " + title + "\n\n## Decision\n\nWe do X.\n\n## Implication\n\n- New code must do Y.\n"
+	return "# " + title + "\n\n## Decision\n\nWe do X.\n\n## Implication\n\n- New code must do Y.\n\n## Why\n\nWithout it, Z drifts and later code can't tell right from wrong.\n"
 }
 
 func TestParseBody_SectionsAndTitle(t *testing.T) {
@@ -42,6 +42,16 @@ func TestValidate_AcceptedHappyPath(t *testing.T) {
 func hasIssue(issues []Issue, substr string) bool {
 	for _, i := range issues {
 		if strings.Contains(i.Message, substr) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasHardIssue reports a non-warning (blocking) issue matching substr.
+func hasHardIssue(issues []Issue, substr string) bool {
+	for _, i := range issues {
+		if !i.Warning && strings.Contains(i.Message, substr) {
 			return true
 		}
 	}
@@ -86,14 +96,37 @@ func TestValidate_GuidanceNoListItemWarns(t *testing.T) {
 	}
 }
 
-func TestValidate_InvariantWithoutWhyWarns(t *testing.T) {
+func TestValidate_AcceptedWithoutWhyHardFails(t *testing.T) {
+	// Reasoning is now co-equal with Decision/Guidance: an accepted record with no
+	// Why is a hard failure, regardless of priority or routing.
 	body := "# T\n\n## Decision\n\nWe do X.\n\n## Guidance\n\n- do x\n"
-	if issues := Validate([]Record{leanRec("0001", "accepted", "invariant", body)}); !hasIssue(issues, "invariant has no Why") {
-		t.Errorf("expected an invariant-has-no-Why warning; got: %+v", issues)
+	for _, priority := range []string{"invariant", "default"} {
+		issues := Validate([]Record{leanRec("0001", "accepted", priority, body)})
+		if !hasHardIssue(issues, "missing or empty required section: Why") {
+			t.Errorf("accepted %s without Why should hard-fail; got: %+v", priority, issues)
+		}
 	}
 	withWhy := body + "\n## Why\n\nRemoving it silently breaks the privacy boundary.\n"
-	if issues := Validate([]Record{leanRec("0001", "accepted", "invariant", withWhy)}); hasIssue(issues, "invariant has no Why") {
-		t.Errorf("a populated ## Why should clear the warning; got: %+v", issues)
+	if issues := Validate([]Record{leanRec("0001", "accepted", "invariant", withWhy)}); hasIssue(issues, "required section: Why") {
+		t.Errorf("a populated ## Why should clear the failure; got: %+v", issues)
+	}
+}
+
+func TestValidate_ProposedWithoutWhyWarnsOnly(t *testing.T) {
+	body := "# T\n\n## Decision\n\nWe do X.\n\n## Guidance\n\n- do x\n"
+	issues := Validate([]Record{leanRec("0001", "proposed", "default", body)})
+	if !hasIssue(issues, "no Why yet") {
+		t.Errorf("proposed without Why should warn; got: %+v", issues)
+	}
+	if hasHardIssue(issues, "Why") {
+		t.Errorf("proposed without Why must not hard-fail; got: %+v", issues)
+	}
+}
+
+func TestValidate_TerminalWithoutWhyExempt(t *testing.T) {
+	body := "# T\n\n## Decision\n\nWe do X.\n\n## Guidance\n\n- do x\n"
+	if issues := Validate([]Record{leanRec("0001", "deprecated", "default", body)}); hasIssue(issues, "Why") {
+		t.Errorf("a terminal record must not be nudged for a Why; got: %+v", issues)
 	}
 }
 

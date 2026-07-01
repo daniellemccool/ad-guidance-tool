@@ -22,6 +22,12 @@ can apply it in novel situations, not just obey it.
 - Code review may ask "is this decision documented?" and block on a missing ADR.
 - ADRs live in the repo, visible in PRs — rationale survives contributor turnover.
 
+## Why
+
+A rule recorded without its reasoning gets obeyed until it is inconvenient, then quietly broken;
+capturing the why is what lets a contributor apply a decision to a case it never foresaw — and what
+keeps the decision from eroding as the people who made it move on.
+
 ## Alternatives
 
 Prose in `ARCHITECTURE.md` (captures rules but not rationale), inline code comments (not

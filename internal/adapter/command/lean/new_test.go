@@ -22,7 +22,7 @@ func runNew(t *testing.T, dir, stdin string, args ...string) (stdout, stderr str
 	return out.String(), errb.String(), err
 }
 
-const goodBody = "## Decision\n\nWe do X.\n\n## Guidance\n\n- Do Y.\n"
+const goodBody = "## Decision\n\nWe do X.\n\n## Guidance\n\n- Do Y.\n\n## Why\n\nWithout it, later code can't tell a valid change from an invalid one.\n"
 
 func leanFiles(t *testing.T, dir string) []string {
 	t.Helper()
@@ -129,6 +129,41 @@ func TestLeanNew_ProposedScaffoldInvariantHasWhy(t *testing.T) {
 		if !strings.Contains(string(s), want) {
 			t.Errorf("invariant scaffold missing %q:\n%s", want, string(s))
 		}
+	}
+}
+
+func TestLeanNew_ProposedScaffoldDefaultHasWhy(t *testing.T) {
+	dir := t.TempDir()
+	out, errb, err := runNew(t, dir, "", "--title", "A convention", "--priority", "default",
+		"--applies-to", "internal/**/*.go", "--date", "2026-06-29")
+	if err != nil {
+		t.Fatalf("a proposed scaffold should write: %v\n%s", err, errb)
+	}
+	if strings.TrimSpace(out) != "0001" {
+		t.Errorf("stdout = %q, want 0001", out)
+	}
+	files := leanFiles(t, dir)
+	if len(files) != 1 {
+		t.Fatalf("expected one file, got %v", files)
+	}
+	s, _ := os.ReadFile(files[0])
+	if !strings.Contains(string(s), "## Why") {
+		t.Errorf("default scaffold should also prompt for a Why:\n%s", string(s))
+	}
+}
+
+func TestLeanNew_AcceptedWithoutWhyRefused(t *testing.T) {
+	dir := t.TempDir()
+	// An accepted record with Decision + Guidance but no ## Why must be refused —
+	// reasoning is a required section once accepted.
+	noWhy := "## Decision\n\nWe do X.\n\n## Guidance\n\n- Do Y.\n"
+	_, errb, err := runNew(t, dir, noWhy,
+		"--title", "No reason given", "--status", "accepted", "--from-stdin", "--date", "2026-06-29")
+	if err == nil || !strings.Contains(errb, "required section: Why") {
+		t.Fatalf("expected a missing-Why refusal; err=%v stderr=%s", err, errb)
+	}
+	if f := leanFiles(t, dir); len(f) != 0 {
+		t.Errorf("no file should be written when Why is missing; found %v", f)
 	}
 }
 

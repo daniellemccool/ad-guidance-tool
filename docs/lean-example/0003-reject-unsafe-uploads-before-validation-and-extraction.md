@@ -26,6 +26,12 @@ FlowBuilder (which owns the per-platform flow), not in study-level `script.py`.
 - FlowBuilder catches these and renders a safety error page via `port_helpers` before any extraction work.
 - DDP validation may assume a structurally safe file — it never runs on an unsafe upload.
 
+## Why
+
+An unsafe upload — a >2GB file, or a truncated 2GB export — will OOM or mis-parse in the Pyodide
+worker if it reaches validation or extraction. Ordering the safety check first is what guarantees no
+downstream code ever runs on a file it cannot safely handle, rather than each call site re-checking.
+
 ## Checks
 
 - Confirm FlowBuilder calls `check_file_safety(path)` before any DDP validation or extraction call.

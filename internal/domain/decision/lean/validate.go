@@ -163,6 +163,9 @@ func validateOne(r Record, byID map[string]Record) []Issue {
 		if guidanceEmpty(p) {
 			add("missing or empty required section: Guidance")
 		}
+		if sectionEmpty(p, "why") {
+			add("missing or empty required section: Why — state why the rule exists / what it protects, so a reader without the author's context can generalize (not why it's a nice design)")
+		}
 		for _, tok := range PlaceholderTokens {
 			if strings.Contains(r.Body, tok) {
 				add(fmt.Sprintf("body still contains template placeholder %q; fill it in before accepting", tok))
@@ -192,9 +195,13 @@ func validateOne(r Record, byID map[string]Record) []Issue {
 		if g := strings.TrimSpace(guidanceSection(p)); g != "" && !containsPlaceholder(g) && !hasListItem(g) {
 			warn("Guidance has no list item; lead with reviewable bullets (the first bullet is what a compact brief renders)")
 		}
-		if strings.EqualFold(strings.TrimSpace(r.D.Priority), "invariant") {
+		// Nudge a not-yet-accepted draft toward its rationale before the accepted gate
+		// above turns it into a hard failure. filledSection also catches the {...}
+		// placeholder, so a fresh scaffold is reminded. (ADR-0005: warning tier here,
+		// hard-failure tier once accepted.)
+		if status != "accepted" {
 			if _, ok := filledSection(p, "why"); !ok {
-				warn("invariant has no Why; record the rationale (a real ## Why with content) that lets an agent reason about an override")
+				warn("no Why yet; before accepting, state why the rule exists / what it protects so a reader without your context can generalize")
 			}
 		}
 	}

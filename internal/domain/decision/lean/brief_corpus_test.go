@@ -7,6 +7,25 @@ import (
 
 func superseded(r Record) Record { r.D.Status = "superseded by ADR-0099"; return r }
 
+// Why is record-only: it lives in the record on disk for a human or a deliberate
+// LLM read, and is NEVER rendered into any brief mode (which keeps every injection
+// low-token). An invariant with a populated Why must not leak it into a brief.
+func TestBrief_NeverRendersWhy(t *testing.T) {
+	inv := briefRec("0001", "0001-x.md", "invariant", []string{"internal/**/*.go"},
+		"# T\n\n## Decision\n\nWe do X.\n\n## Guidance\n\n- do x\n\n## Why\n\nBecause Z breaks otherwise.\n")
+	recs := []Record{inv}
+	paths := []string{"internal/foo.go"}
+	for name, out := range map[string]string{
+		"file-scoped": Brief(recs, paths, BriefAuto),
+		"whole":       BriefWhole(recs),
+		"invariants":  BriefInvariants(recs),
+	} {
+		if strings.Contains(out, "**Why:**") || strings.Contains(out, "Because Z breaks") {
+			t.Errorf("%s brief must not render Why; got:\n%s", name, out)
+		}
+	}
+}
+
 func TestBrief_OmitsChangedPathsHeader(t *testing.T) {
 	r := briefRec("0004", "0004-pii.md", "invariant", []string{"**/*.py"},
 		"# PII\n\n## Decision\n\nx\n\n## Guidance\n\n- y\n")

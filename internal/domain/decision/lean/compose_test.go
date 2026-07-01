@@ -32,14 +32,12 @@ func TestEnsureTitle(t *testing.T) {
 	}
 }
 
-func TestRenderNewBodyFor_WhyOnlyForInvariant(t *testing.T) {
-	if got := RenderNewBodyFor("T", "invariant"); !strings.Contains(got, "## Why") {
-		t.Errorf("invariant scaffold should include a Why stub:\n%s", got)
-	}
-	if got := RenderNewBodyFor("T", "default"); strings.Contains(got, "## Why") {
-		t.Errorf("default scaffold should not include a Why stub:\n%s", got)
-	}
-	if got := RenderNewBodyFor("T", ""); strings.Contains(got, "## Why") {
-		t.Errorf("unprioritized scaffold should not include a Why stub:\n%s", got)
+func TestRenderNewBodyFor_AlwaysScaffoldsWhy(t *testing.T) {
+	// Every routed record carries its rationale, so the scaffold prompts for a Why
+	// regardless of priority (the invariant-vs-default distinction is in the validator).
+	for _, priority := range []string{"invariant", "default", ""} {
+		if got := RenderNewBodyFor("T", priority); !strings.Contains(got, "## Why") {
+			t.Errorf("scaffold for priority %q should include a Why stub:\n%s", priority, got)
+		}
 	}
 }

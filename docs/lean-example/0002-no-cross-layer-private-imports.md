@@ -25,3 +25,9 @@ violates that contract and creates hidden coupling between layers that should be
 - Any `from port.helpers.flow_builder import _something` in `script.py` or `platforms/` is a review violation.
 - The fix is always the same: if a function is genuinely needed across layers, rename it without the
   underscore and move it to the appropriate shared layer (`helpers/`) — a deliberate decision, not a reach-in.
+
+## Why
+
+A private cross-layer import couples layers that must evolve independently; once one exists the
+boundary the layering exists to protect is silently gone, and every later import copies the mistake
+until refactoring any one layer means untangling all of them.

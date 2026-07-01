@@ -19,7 +19,9 @@ its mechanically-checkable parts are enforced as advisory warnings by `adg lean 
 - **Decision** — the rule, in **one to three sentences of prose**. Nothing else.
 - **Guidance** — reviewable consequences as bullets: what new code must do, what review
   rejects, where the fix belongs.
-- **Why** — only when weakening or "simplifying" the rule would be tempting or dangerous.
+- **Why** — the reasoning: why the rule exists / what it protects, so a reader can generalize.
+  Required on every finished (accepted) record; keep it to the reason in one line, not a design
+  essay. Record-only — never rendered into a brief.
 - **Checks** — only concrete grep/test/manual checks.
 
 ## Authoring discipline
@@ -35,8 +37,10 @@ its mechanically-checkable parts are enforced as advisory warnings by `adg lean 
    files that implement or could violate the rule; prefer naming them over a broad `**`.
    Over-broad scope inflates every brief it touches and manufactures overlap. (A boundary
    that lives in one file should not route into every sibling.)
-4. **Reserve `Why` for invariants** (and the rare default whose override is genuinely
-   load-bearing). A default with a `Why` is usually padding — Guidance should carry it.
+4. **Every finished record carries its `Why`.** State why the rule exists in one line — do not
+   omit it as "padding" and do not pad it into an essay. For an invariant, the `Why` is what
+   breaks if the rule is weakened. Required once the record is `accepted`, and record-only (it
+   is never injected into a brief, so it costs nothing at edit time).
 5. **Re-judge priority; don't inherit it.** `invariant` = a rule an agent must never
    silently simplify or breach — a *defect* if violated, not a convention. Mark a genuine
    hard constraint `invariant` even if its source record treated it softly.
@@ -47,8 +51,8 @@ its mechanically-checkable parts are enforced as advisory warnings by `adg lean 
    extraction architecture" — not "Single extraction: FlowBuilder + curated extraction +
    DDP_CATEGORIES". A colon-separated list of mechanisms in the title means the ADR is
    doing too much.
-8. **State each fact once.** Decision = the rule, Guidance = what to do, Why = the
-   rationale. Don't repeat the same enumeration across Decision and Guidance.
+8. **State each fact once.** Decision = the rule, Guidance = what to do, Why = the reasoning
+   (required). Don't repeat the same enumeration across Decision and Guidance.
 9. **For a behavioral rule, point at its test(s).** List the test that exercises the rule as
    a `companion` when it's an expected partner edit; put it in `applies_to` instead when a
    test *is* the rule's executable enforcement (editing the test means editing the rule).
@@ -74,12 +78,14 @@ implementation seems to work:
 
 Everything else is a `default` (a convention).
 
-## When is `Why` required?
+## The `Why` (required on every accepted record)
 
-Include `Why` when an agent might otherwise make a "reasonable" simplification that breaks
-the system. A good `Why` answers **"what bad thing happens if someone removes or weakens
-this?"** — not "why is this a nice design?". For defaults, skip it unless the rule is
-surprising.
+A `## Why` is required on every accepted record — it is a section co-equal with Decision and
+Guidance, and `adg lean index` hard-fails an accepted record without one. It answers **"why
+does this rule exist / what breaks without it?"** — not "why is this a nice design?". For an
+invariant, center it on what breaks if the rule is breached or weakened. Keep it to the reason,
+one line. It is **record-only**: it lives in the record for a human (or an LLM that deliberately
+opens the file) and is never rendered into a brief, so it costs nothing at injection time.
 
 ## When to combine vs split
 
@@ -96,14 +102,15 @@ A compact brief renders **only the first Guidance bullet** of a default. So:
 
 If not, rewrite the first bullet — it is now load-bearing.
 
-## What the tool checks (deterministic, advisory)
+## What the tool checks (deterministic)
 
-`adg lean index` warns on the mechanical subset of this rubric (warnings, never failures;
-skipped on terminal records and on unfilled scaffold placeholders):
+`adg lean index` **hard-fails** an accepted record that is missing a required section —
+Decision, Guidance, or `## Why` (a heading alone doesn't count). It also **warns** (never
+fails) on the mechanical leanness subset of this rubric, skipped on terminal records and on
+unfilled scaffold placeholders:
 
 - Decision contains a list, or runs over `MaxDecisionWords` (~60).
 - Guidance has no list item (lead with reviewable bullets).
-- An `invariant` has no real `## Why` (a heading alone doesn't count).
 
 The judgment-level rules (2, 3, 5, 7, 8 and "is the first bullet load-bearing?") are not
 mechanically checkable — they are what a human reviewer or `adg lean review` weighs.

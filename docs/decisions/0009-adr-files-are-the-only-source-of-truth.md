@@ -27,3 +27,10 @@ The generated README index is a pure projection of the files — derived output,
   never read back as state — treat it as build output, safe to delete and recreate.
 - An optimization that caches parsed records must be in-memory and per-invocation, not persisted as a
   source of truth.
+
+## Why
+
+Any second store the tool trusts as authoritative — an index, a sidecar DB, a persisted cache — can drift
+from the markdown, and then the guidance an agent sees stops matching what is on disk. Reading the files
+on every read is what keeps advisory routing and enforcement honest about the same bytes; the generated
+README is a projection, not an input, precisely so nothing downstream can depend on stale state.

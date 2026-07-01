@@ -41,7 +41,7 @@ adg lean new --model docs/decisions \
     --title "Reject unsafe uploads before validation and extraction" \
     --status accepted --priority invariant --category Extraction \
     --applies-to 'port/**/*.py' --excludes '**/port_helpers.py'
-# → prints the new ID; scaffolds Decision/Guidance (and a Why scaffold for invariants)
+# → prints the new ID; scaffolds Decision / Guidance / Why
 ```
 
 Pass `--from-stdin` to supply the body yourself; otherwise fill in the scaffolded
@@ -74,7 +74,7 @@ One to three sentences: what was decided.
 
 - What new code must do, what review rejects, the fix path.
 
-## Why            # optional; expected for invariants — the rationale that lets an agent reason about an override
+## Why            # required on an accepted record — why the rule exists / what it protects, so a reader can generalize (record-only; never in a brief)
 ## Checks         # optional; grep targets / invariants, rolled up into the brief
 ```
 
@@ -97,15 +97,16 @@ Compact, high-leverage subset of `references/lean-rubric.md` — apply it before
   the edit alone (it's what a compact brief renders).
 - [ ] **`applies_to`** names the few files that enforce the rule, not the whole neighborhood;
   a pure prohibition is `forbids`-only (no `applies_to` re-describing the mechanism).
-- [ ] **`Why`** only for invariants; `invariant` means "must never be silently simplified or
-  breached," re-judged — not inherited from the source record.
+- [ ] **`Why`** states why the rule exists — required on every accepted record (record-only,
+  never injected into a brief); an invariant's `Why` makes explicit what breaks if it is weakened.
 - [ ] Body names the **mechanism/file**, not the **ADR number** (numbers churn on renumber).
 - [ ] Behavioral rule? List its **test(s)** — as `companions` if they're partner edits, or in
   `applies_to` if a test *is* the rule's enforcement. Add `## Checks` only for concrete
   grep/verification targets not already implied by Guidance.
 
-`adg lean index` flags the mechanical subset of this (Decision-as-list / over-length,
-Guidance-without-a-bullet, invariant-without-`Why`) as advisory warnings.
+`adg lean index` flags the mechanical leanness subset of this (Decision-as-list / over-length,
+Guidance-without-a-bullet) as advisory warnings; a missing required section (Decision, Guidance,
+or `## Why`) on an accepted record is a hard failure.
 
 ### Preview how it routes
 
@@ -146,10 +147,11 @@ adg lean index --model docs/decisions --root .             # also scope-lint glo
 adg lean index --model docs/decisions --root . --overlaps  # + opt-in scope-hub overlap diagnostic
 ```
 
-`adg lean index` hard-fails on a duplicate ID or a brace glob and warns on glob hygiene,
-over-length bodies, leanness nudges (Decision as a list or over-length, Guidance with no
-bullet, an invariant with no `Why` — see `references/lean-rubric.md`), and (with `--root`)
-stale `applies_to`/`excludes` and `forbids` that now match a file. The leanness warnings are
+`adg lean index` hard-fails on a duplicate ID, a brace glob, or an accepted record missing a
+required section (Decision, Guidance, or `## Why`); it warns on glob hygiene, over-length
+bodies, and leanness nudges (Decision as a list or over-length, Guidance with no bullet — see
+`references/lean-rubric.md`), and (with `--root`) stale `applies_to`/`excludes` and `forbids`
+that now match a file. The leanness warnings are
 advisory and skip terminal records and unfilled scaffold placeholders. Wire `adg lean index
 --root` into CI for real enforcement — the hook only routes; the index gates.
 

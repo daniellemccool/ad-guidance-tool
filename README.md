@@ -63,7 +63,7 @@ One model directory, one chronological `NNNN` sequence. Pick the format by what 
 | | MADR | Lean |
 |---|---|---|
 | **Purpose** | Durable record of a decision and its alternatives | Active rule consulted before an edit |
-| **Body** | Context / Considered Options / Decision Outcome | Decision / Guidance (+ optional Why, Checks) |
+| **Body** | Context / Considered Options / Decision Outcome | Decision / Guidance / Why (+ optional Checks) |
 | **Lifecycle** | `add` → `edit` → `decide` → `supersede` / `revise` | `lean new` → validate → route via the brief |
 | **Routing** | none | `applies_to` / `excludes` / `forbids` / `companions` globs |
 | **Consumed by** | humans, archaeology | the compiled brief + the PreToolUse hook |
@@ -137,8 +137,9 @@ Considered Options, Decision Outcome) or the command refuses.
 
 ## Lean format and governance
 
-A lean record is one screen, optimized for the compiled brief. Required sections are `Decision` and
-`Guidance`; `Why` (expected for invariants) and `Checks` are optional. Routing lives in frontmatter:
+A lean record is one screen, optimized for the compiled brief. Required sections are `Decision`,
+`Guidance`, and `Why` (the reasoning — required on every accepted record, but **record-only**: never
+rendered into a brief); `Checks` is optional. Routing lives in frontmatter:
 
 ```markdown
 ---
@@ -161,7 +162,7 @@ One to three sentences: what was decided.
 
 - What new code must do, what review rejects, the fix path.
 
-## Why            # optional; expected for invariants
+## Why            # required on an accepted record; record-only (never in a brief)
 ## Checks         # optional; grep targets rolled up into the brief
 ```
 

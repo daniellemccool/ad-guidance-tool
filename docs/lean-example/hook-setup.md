@@ -1,169 +1,82 @@
-# Pre-edit hook: inject the architecture brief automatically
+# Hooks: inject the brief, guard the model
 
-This wires the lean `brief` into Claude Code as a **PreToolUse** hook. Before the agent edits a
-file, the hook compiles the brief for *that file* and injects it as `additionalContext` — so the
-ADRs governing the file are in context at edit time, at the cost of ~20–40 lines (the brief), not the
-whole ADR corpus. It is **fail-open**: if no ADR governs the file, or anything errors, the hook emits
-nothing and the edit proceeds. It **dedupes per session**: each ADR is injected at most once per
-Claude Code session (keyed by the payload's `session_id`), so repeated edits to broadly-scoped files
-don't re-pay for the same brief — a forbids violation always re-surfaces, and with no `session_id` it
-injects every time.
+The `write-adr` plugin bundles a suite of Claude Code hooks that route the compiled lean brief into the
+model across the change lifecycle, and guard the ADR model itself. Every hook is **fail-open** (any error,
+or no governing ADR, injects nothing and the action proceeds) except two deliberate blocks, noted below.
+
+| When | Event · matcher | What it does |
+|---|---|---|
+| Session start | `SessionStart` · startup/clear/compact | inject the **whole-corpus brief** (all in-force ADRs; invariants full, defaults condensed) once |
+| Plan dispatch | `SubagentStart` · `Plan` | inject the **invariants** into the planning subagent |
+| Before an edit | `PreToolUse` · Edit/Write/MultiEdit | inject the **file-scoped brief** (deduped per session) |
+| Before a commit | `PreToolUse` · Bash | brief the **staged** files; **block** on a `forbids` hit (deterministic) |
+| ADR write/edit | `PreToolUse` · Edit/Write/MultiEdit | **guard**: **block** hand-creating a record, warn on editing one |
+| Before a commit | `PreToolUse` · Bash + `if: git commit *` | **agent**: review whether the staged code **complies** with the governing ADRs (advisory) |
+| ADR changed on disk | `FileChanged` · ADR glob | **agent**: review the changed **record** against the lean rubric |
+
+The two blocks are the commit `forbids` gate and the ADR-creation guard ([ADR-0005](../decisions/0005-validation-has-enforcement-tiers.md)); everything else advises.
 
 ## 1. Install adg
 
-These hooks invoke `adg` as a bare command, so it must be on your `PATH`. Install the prebuilt binary
-(no Go toolchain needed):
+The hooks invoke `adg` as a bare command, so it must be on your `PATH` (the plugin's `bin/adg` rides along
+for the *skills*, but the hooks run outside that PATH). Prebuilt binary, no Go toolchain:
 
 ```
 curl -fsSL https://raw.githubusercontent.com/daniellemccool/ad-guidance-tool/main/install.sh | sh
 ```
 
-Or from source: `go install .` (or `go build -o ~/.local/bin/adg .`). `adg lean brief --hook` is the
-hook entry point — no separate binary needed.
+From source: `go install .`. The hook entry point is `adg lean brief --hook` (with `--whole` / `--invariants`
+/ `--staged` / `--guard` selecting the mode); the two agent hooks need no `adg` change — they orchestrate
+`git diff` + `adg lean brief`.
 
-## 2. Register the hook
+## 2. Enable
 
-> **Using the `write-adr` plugin (v1.2.0+)?** Skip this step. The plugin bundles this exact
-> PreToolUse hook in `hooks/hooks.json`, so enabling the plugin registers it automatically — you
-> still need step 1 (system `adg` on `PATH`). The manual registration below is for repos that wire
-> the hook in directly without the plugin.
+**With the plugin (recommended):** enabling `write-adr` registers all of the above from
+`tools/adr-plugin/hooks/hooks.json` — you only need step 1. Skip to Verify.
 
-In the target repo's `.claude/settings.json` (project scope), point `--model` at that repo's lean ADR
-directory:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "adg lean brief --hook --model docs/decisions",
-            "timeout": 30
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-The hook runs from the project root, so a relative `--model` resolves correctly. The edited file's
-absolute path is relativized against the project root before matching, so `applies_to` globs are
-written repo-root-relative (e.g. `port/**/*.py`).
+**Without the plugin:** copy that `hooks.json` into the target repo's `.claude/settings.json` and point each
+`--model` at the repo's lean ADR directory. The hooks run from the project root, so a relative `--model`
+resolves, and the edited path is relativized before matching (write `applies_to` globs repo-root-relative,
+e.g. `port/**/*.py`). The two agent hooks (`type: agent`) and `FileChanged` are **experimental** — confirm
+they fire in a live session before relying on them.
 
 ## 3. Verify
 
-Run `/hooks` in Claude Code to confirm the `PreToolUse` hook is registered, then edit a file that an
-ADR's `applies_to` matches — the brief appears in context. To test the binary directly without a live
-session, feed it the same JSON Claude Code sends:
+Run `/hooks` in Claude Code to confirm registration. Test a `command` hook directly with the JSON Claude
+Code sends:
 
 ```
 printf '{"cwd":"%s","tool_name":"Edit","tool_input":{"file_path":"%s/port/helpers/flow_builder.py"}}' "$PWD" "$PWD" \
   | adg lean brief --hook --model docs/lean-example
 ```
 
-A governed file prints a `hookSpecificOutput.additionalContext` JSON object; an ungoverned file
-prints nothing.
-
-## Golden path: the always-on convention
-
-The hook injects the brief at *edit* time — a safety net once the agent touches a governed file. But
-the higher-value moment is *planning*: the agent should pull the brief for the paths it expects to
-touch **before** it designs a change, so it doesn't commit to (say) a forbidden second pipeline and
-only get told at write time. Don't rely on the agent *auto-discovering* the `write-adr` skills to do
-this — skill auto-discovery on phrasings like "add an ADR" or "comply with our decisions" is
-unreliable in practice; the brief reaches the model dependably only through the hook (at edit time)
-and an always-loaded convention (at planning time).
-
-So put a short convention in the **consuming repo's `CLAUDE.md`**, which the agent reads every session:
-
-```markdown
-## Architecture decisions (adg)
-
-Working agreements live as lean ADRs in `docs/decisions/`, compiled into a brief.
-**Consult them while planning a change, not just at write time** — a PreToolUse hook injects the
-brief on edits, but pull it yourself *before* you design the change:
-
-    adg lean brief --model docs/decisions <paths you expect to touch>
-
-Treat the brief as constraints:
-- **Invariant** → a hard rule; read the full ADR before planning.
-- **Forbidden scope matched** → stop and surface the conflict; don't build it.
-- **Companions** → check whether the related files also need edits.
-- **No brief appeared** → never assume no rule applies.
-
-After editing, run `adg lean index --model docs/decisions --root .` and the tests.
-If the change establishes a reusable pattern, record it with `adg lean new`.
-```
-
-The two layers are complementary: the **convention** gets the agent to consult governance up front —
-it catches feature work like "create a new extractor," which the hook only sees once files are being
-written — and the **hook** is the backstop for edits the agent makes without consulting it first.
+A governed file prints a `hookSpecificOutput.additionalContext` object; an ungoverned file prints nothing.
+`--whole`/`--invariants` take a `SessionStart`/`SubagentStart` payload; `--guard`/`--staged` take the
+Edit/Bash payload. The `agent`/`FileChanged` hooks can only be exercised in a live session.
 
 ## Notes
 
-- **Advisory routing, not comprehensive enforcement.** This hook fires only on Claude's
-  `Edit`/`Write`/`MultiEdit`. It will **not** catch shell edits, formatters, generated rewrites, manual
-  human edits, or other agents/tools, and it is fail-open — so **"no brief appeared" never means "no rule
-  applies."** Use `adg lean index --root` in CI, code review, or executable checks for actual enforcement.
-- **Token cost** is the point: only matching ADRs are injected. An edit to an ungoverned file costs
-  zero tokens. A file under a broad invariant plus a couple of path-scoped defaults is ~30–40 lines.
-- **Prereq:** the repo's ADRs must be in the lean format with routing frontmatter — `applies_to`
-  (and optionally `excludes` / `forbids` / `companions` and `priority`). The hook routes on
-  `applies_to` and `forbids` (an edit to a forbidden path injects the rule as a violation) and honors
-  `excludes`; until a repo's records are migrated/annotated it simply no-ops there. See the lean-format
-  reference (`tools/adr-plugin/skills/write-lean-adr/references/lean-format.md`) for the full schema.
-- **Contract:** `PreToolUse` + exit 0 + `{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"…"}}`
-  injects to the model without blocking the edit. The logic lives in `lean.HookContext`
-  (`internal/domain/decision/lean/hook.go`); `adg lean brief --hook` is a thin stdin/stdout shell.
-
-## Post-edit hook (optional): re-check on stop
-
-The PreToolUse hook prevents mistakes *before* an edit; a **Stop** hook catches misses *after*.
-`adg lean verify --hook` re-runs validation (and `--root .` scope lint) and re-renders the brief —
-with its "Before you finish" footer (checks + named tests to run) — for the files changed this
-session (derived from git: working tree vs HEAD, plus untracked). It is **advisory and
-non-blocking**: output goes to stderr and it always exits 0, so it never prevents stopping.
-
-> **Note:** the `write-adr` plugin does **not** bundle this Stop hook — it fires on every turn-end,
-> which is usually too frequent. The plugin bundles only the per-session-deduped PreToolUse hook. For
-> periodic enforcement, prefer the commit-time gate (next section) over a Stop hook. The snippet below
-> is for repos that still want the Stop re-check wired in manually.
-
-```json
-{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "adg lean verify --hook --model docs/decisions",
-            "timeout": 60
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-What it proves and doesn't: re-running the index validates the **model and scope routing**, not that
-the edited code obeys the prose guidance — so the footer is a prompt to verify, not a proof of
-compliance. Code-level enforcement comes from executable `checks` (`adg lean check`) and CI. Blocking
-behavior is deliberately *not* wired here yet; the Stop hook only warns.
+- **Advisory routing, not comprehensive enforcement.** The hooks fire on Claude's tool calls only — not on
+  shell edits, formatters, or other tools — and are fail-open, so **"no brief appeared" never means "no rule
+  applies."** Real enforcement is `adg lean index --root` in CI, the commit gate below, and the executable
+  `## Checks`.
+- **Token cost is the point:** only matching ADRs are injected; an edit to an ungoverned file costs zero.
+  The file-scoped brief dedupes per session (each ADR at most once; a `forbids` hit always re-surfaces); the
+  whole-corpus brief fires once per session; the guard never dedupes.
+- **Prereq:** the model must be lean records with routing frontmatter (`applies_to`, optional
+  `excludes`/`forbids`/`companions`/`priority`). See
+  [`lean-format.md`](../../tools/adr-plugin/skills/write-lean-adr/references/lean-format.md).
+- **Where the logic lives:** `lean.HookContext` / `SessionBrief` / `SubagentBrief` / `CommitAdvisory` /
+  `ModelGuard` in `internal/domain/decision/lean/`; `adg lean brief --hook …` is a thin stdin/stdout shell.
 
 ## Commit-time enforcement gate (recommended)
 
-Enforcement belongs at commit time, not on every edit or every turn. The lean `pre-commit` template
-(`tools/adr-plugin/skills/write-lean-adr/assets/githooks/pre-commit`) runs once per commit:
-`adg lean index --root .` (validate the model — hard-fails on duplicate IDs or bad globs) and
-`adg lean check` on the staged files (the executable grep rules). It is **graceful**: if `adg` is not
-on `PATH` it warns and lets the commit through, so contributors without `adg` are never blocked — use
-CI for comprehensive enforcement.
+The bundled commit hook advises; hard enforcement belongs in a git `pre-commit`. The lean template
+(`tools/adr-plugin/skills/write-lean-adr/assets/githooks/pre-commit`) runs once per commit: `adg lean index
+--root .` (validates the model) and `adg lean check` on staged files (the executable grep rules). It is
+**graceful** — if `adg` is absent it warns and lets the commit through — so CI is the comprehensive gate.
+Install with `cp …/pre-commit .git/hooks/pre-commit` (or the same logic in `.husky/pre-commit`); override the
+model dir with `ADR_MODEL` (default `docs/decisions`).
 
-Install it directly (`cp …/pre-commit .git/hooks/pre-commit`) or, in a repo using Husky, drop the
-same logic into `.husky/pre-commit`. Override the model dir with `ADR_MODEL` (default `docs/decisions`).
+A **`Stop`** hook (`adg lean verify --hook`) that re-shows the brief for changed files at turn-end is
+available for manual wiring but **not bundled** — it fires every turn, too often; prefer the commit gate.

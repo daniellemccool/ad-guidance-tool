@@ -84,16 +84,7 @@ func HookContext(records []Record, payload []byte) string {
 		saveSessionEmitted(in.SessionID, emitted)
 	}
 
-	out, err := json.Marshal(map[string]any{
-		"hookSpecificOutput": map[string]any{
-			"hookEventName":     "PreToolUse",
-			"additionalContext": Brief(emit, changed, BriefAuto),
-		},
-	})
-	if err != nil {
-		return ""
-	}
-	return string(out)
+	return hookEnvelope("PreToolUse", Brief(emit, changed, BriefAuto))
 }
 
 // hookRelPath makes the edited file path relative to the hook's cwd (the project

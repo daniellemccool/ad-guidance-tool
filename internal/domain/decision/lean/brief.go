@@ -63,29 +63,112 @@ func Brief(records []Record, changedPaths []string, mode BriefMode) string {
 
 	switch mode {
 	case BriefFull:
-		return renderBrief(invariants, defaults, changedPaths, false)
+		return renderBrief(invariants, defaults, false)
 	case BriefCompact:
-		return renderBrief(invariants, defaults, changedPaths, true)
+		return renderBrief(invariants, defaults, true)
 	default: // BriefAuto: full unless it blows the one-screen budget.
-		full := renderBrief(invariants, defaults, changedPaths, false)
+		full := renderBrief(invariants, defaults, false)
 		if briefLineCount(full) <= MaxBriefLines {
 			return full
 		}
-		return renderBrief(invariants, defaults, changedPaths, true)
+		return renderBrief(invariants, defaults, true)
 	}
+}
+
+// conventionPreamble frames the corpus briefs (SessionStart / SubagentStart) with the
+// same "how to treat these" contract the golden-path CLAUDE.md convention carries, so
+// the guidance reaches the model through the hook even when the convention text is not
+// loaded. It ends with a blank line; the sections that follow attach directly.
+const conventionPreamble = `# Architecture brief
+
+These lean ADRs are the working agreements that govern this codebase. Consult them while you plan a change, not only when you edit:
+- **Invariant** — a hard rule; open the linked record before planning a change that touches it.
+- **Forbidden scope** — if a rule marks paths off-limits, stop and surface the conflict; do not build it.
+- **Related files** — when a rule names companions, check whether they also need edits.
+- **No rule shown never means no rule applies** — routing is advisory and fail-open.
+
+Before you design a change, pull the file-scoped brief for the paths you expect to touch:
+    adg lean brief <paths>
+
+`
+
+// BriefWhole compiles the whole-corpus brief: every in-force ADR, invariants in full
+// and defaults condensed, with no path routing, no companions, and no footer. It is the
+// SessionStart injection — the agent sees the full set of working agreements once per
+// session, before the first prompt. Rendering reuses the same entry helpers as the
+// routed Brief (ADR-0002: one renderer). Empty when no in-force ADRs exist.
+func BriefWhole(records []Record) string {
+	inv, def := corpusSplit(records)
+	if len(inv)+len(def) == 0 {
+		return ""
+	}
+	return renderCorpus(inv, def, true)
+}
+
+// BriefInvariants compiles the invariants-only brief: every in-force invariant ADR in
+// full, no defaults, no companions, no footer. It is the SubagentStart (Plan) injection
+// — the architect starts with the hard constraints in view. The SubagentStart payload
+// carries no file paths, so this cannot be path-scoped; the invariants are the
+// always-relevant floor. Empty when the model declares no invariants.
+func BriefInvariants(records []Record) string {
+	inv, _ := corpusSplit(records)
+	if len(inv) == 0 {
+		return ""
+	}
+	return renderCorpus(inv, nil, false)
+}
+
+// corpusSplit partitions the in-force records into invariants and defaults by priority,
+// each sorted by ID. Terminal records are dropped via inForce — the same lifecycle gate
+// routeMatch applies — so the corpus briefs never surface a retired rule. The briefHits
+// carry a zero route: they are unrouted entries, rendered from their declared scope.
+func corpusSplit(records []Record) (invariants, defaults []briefHit) {
+	for _, r := range records {
+		if !inForce(r.D.Status) {
+			continue
+		}
+		h := briefHit{rec: r}
+		if strings.EqualFold(strings.TrimSpace(r.D.Priority), "invariant") {
+			invariants = append(invariants, h)
+		} else {
+			defaults = append(defaults, h)
+		}
+	}
+	byID := func(hs []briefHit) { sort.Slice(hs, func(i, j int) bool { return hs[i].rec.ID < hs[j].rec.ID }) }
+	byID(invariants)
+	byID(defaults)
+	return invariants, defaults
+}
+
+// renderCorpus renders a corpus brief: the convention preamble, invariants in full (no
+// companions), and — when includeDefaults — defaults as a condensed checklist. No
+// related-files section and no "Before you finish" footer: those are edit/commit-time
+// concerns, not session-start framing.
+func renderCorpus(invariants, defaults []briefHit, includeDefaults bool) string {
+	var b strings.Builder
+	b.WriteString(conventionPreamble)
+
+	if len(invariants) > 0 {
+		b.WriteString("## Hard constraints (invariants)\n\n")
+		for _, h := range invariants {
+			b.WriteString(briefEntry(h.rec, h.route, true, false))
+		}
+	}
+	if includeDefaults && len(defaults) > 0 {
+		b.WriteString("## Defaults & conventions (condensed — open the record for full guidance)\n\n")
+		for _, h := range defaults {
+			b.WriteString(compactDefaultLine(h.rec))
+		}
+	}
+	return b.String()
 }
 
 // renderBrief writes the brief. With compactDefaults, each plain default collapses
 // to a checklist line and companions are aggregated once at the end; invariants and
 // forbidden-path hits always render in full.
-func renderBrief(invariants, defaults []briefHit, changedPaths []string, compactDefaults bool) string {
+func renderBrief(invariants, defaults []briefHit, compactDefaults bool) string {
 	var b strings.Builder
 	b.WriteString("# Architecture brief\n\n")
-	fmt.Fprintf(&b, "Changed paths (%d):\n", len(changedPaths))
-	for _, p := range changedPaths {
-		fmt.Fprintf(&b, "- %s\n", p)
-	}
-	b.WriteString("\n")
 
 	total := len(invariants) + len(defaults)
 	if total == 0 {
@@ -207,8 +290,13 @@ func briefEntry(r Record, route routeResult, includeWhy, includeCompanions bool)
 			fmt.Fprintf(&b, " · excluded: %s", strings.Join(route.excluded, ", "))
 		}
 		b.WriteString("_\n\n")
-	} else {
+	} else if len(route.forbidden) > 0 {
 		fmt.Fprintf(&b, "_scope: forbids %s_\n\n", strings.Join(route.forbidden, ", "))
+	} else if len(r.D.AppliesTo) > 0 {
+		// Unrouted corpus entry (no changed path drove it in): show the declared scope.
+		fmt.Fprintf(&b, "_scope: %s_\n\n", strings.Join(r.D.AppliesTo, ", "))
+	} else {
+		b.WriteString("_scope: (no applies_to globs — see the record)_\n\n")
 	}
 
 	// A forbids hit is a violation — the change touches negative-space the ADR marks

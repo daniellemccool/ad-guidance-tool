@@ -37,9 +37,16 @@ re-bloating it back to full MADR.
 4. **Section name unchanged: `## Why`.** The contract changes; the name and section key
    (`"why"`) do not — zero migration of the parser, the brief renderer, or existing records'
    headings.
-5. **Brief rendering unchanged (record-only).** The reasoning teaches whoever opens the
-   record; the injected brief stays lean. Full-mode brief continues to surface `Why` for
-   invariants only; the compact/hub path is untouched; a default's `Why` is not injected.
+5. **No brief renders `Why` — at all (record-only, uniform).** Correction to an earlier
+   assumption: today the renderer *does* emit `Why` for invariants (`renderCorpus` and
+   `renderBrief` both call `briefEntry(..., includeWhy=true)`; defaults already pass `false`).
+   That is removed. `briefEntry` never renders `Why`, so every brief mode — file-scoped
+   edit-time, whole-corpus SessionStart, `--invariants` SubagentStart, the PreToolUse hook —
+   is uniformly `Why`-free: Decision + Guidance only, exactly as defaults render today. The
+   reasoning lives solely in the record on disk, for a human reading it or an LLM that
+   specifically opens it. The token cost of every injection is unchanged (slightly lower for
+   invariant-heavy briefs). The low-token context-harness behaviour must not change in any
+   other way.
 
 ## Content contract for `## Why`
 
@@ -52,6 +59,15 @@ preserved by **brevity, not omission** — if a `Why` reads as padding, tighten 
 reason; do not drop it.
 
 ## Components to change
+
+### 0. Brief renderer — `internal/domain/decision/lean/brief.go` (strip `Why`)
+Make every brief `Why`-free. Drop the `includeWhy` parameter from `briefEntry` and remove its
+`Why`-rendering block; update the three call sites (`renderCorpus` line ~154, `renderBrief`
+lines ~188 and ~203) to the reduced signature. ADR-0002 (one renderer) is satisfied — the
+change is inside the single shared renderer, so the hook, CLI, and CI all stop emitting `Why`
+together. Add a test asserting no brief mode renders `**Why:**` even when an invariant with a
+populated `Why` routes in. This preserves the low-token context-harness behaviour and is the
+concrete meaning of "record-only."
 
 ### 1. Validator — `internal/domain/decision/lean/validate.go`
 Replace the current invariant-only `Why` warning (and the interim routed-default warning) with
@@ -154,6 +170,9 @@ validate.go` and `template.go`, so the tool records its own new format rule. Rev
 
 ## Success criteria
 
+0. No brief mode (`adg lean brief`, `--whole`, `--invariants`, `--hook`) renders `**Why:**`,
+   even for an invariant that has a populated `Why` — verified by a test. The rest of the brief
+   output is byte-for-byte what it is today.
 1. `adg lean index` hard-fails an accepted record with no `## Why`; warns a proposed one;
    exempts terminal records — with tests covering each tier.
 2. `adg lean new --status accepted` refuses to write a record lacking a filled `Why`.

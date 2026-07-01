@@ -13,24 +13,78 @@
 - Section name stays `## Why`; parser section key stays `"why"`. No renames.
 - Enforcement tier (ADR-0005): hard failure on `status == "accepted"`; warning on other in-force statuses (`proposed`, `amended by ADR-NNNN`); terminal (`rejected`/`deprecated`/`superseded by ADR-NNNN`) exempt via `inForce`.
 - `## Why` content contract: *why the rule exists / what it protects, so a reader without the author's context can generalize* — not "why it's a nice design." Invariants: the breach-danger is the flavor of that reasoning.
-- Brief renderer is NOT changed: full-mode brief still surfaces `Why` for invariants only; compact/hub path untouched; a default's `Why` is not injected.
+- Brief renderer emits NO `Why` in any mode. Today it renders `Why` for invariants (`briefEntry(..., includeWhy=true)` at `renderCorpus`/`renderBrief`); that is removed in Task 1 so every brief — file-scoped, whole-corpus, `--invariants`, hook — is Decision + Guidance only. All other brief output stays byte-for-byte identical (the low-token context-harness behaviour must not change). `Why` lives only in the record on disk.
 - Commit trailer: `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
 - Branch: `feat/lean-adr-reasoning-required` (already created; spec already committed).
 - Current WIP already in the tree (from before the redesign): scaffold `RenderNewBodyFor` already emits `## Why` for every priority (`internal/domain/decision/lean/template.go`); `compose_test.go` already asserts that; `new_test.go` already has `TestLeanNew_ProposedScaffoldDefaultHasWhy`; `validate.go` holds an INTERIM warn-only Why block to be replaced in Task 1; `lean_test.go` holds interim `routedRec` + `TestValidate_RoutedDefaultWithoutWhyWarns` to be rewritten in Task 1; three routed defaults (0004/0007/0009) already have `## Why`.
 
 ---
 
-### Task 1: Validator — `## Why` is a required section
+### Task 1: Renderer strip + validator — `## Why` is required and record-only
 
 **Files:**
+- Modify: `internal/domain/decision/lean/brief.go` (`briefEntry` signature ~line 277 and its Why block ~lines 330–335; call sites at ~154, ~188, ~203)
+- Modify: `internal/domain/decision/lean/brief_corpus_test.go` (add a no-Why-in-brief guard test)
 - Modify: `internal/domain/decision/lean/validate.go` (the `status == "accepted"` block ~line 159; the interim Why block in the `inForce` block ~line 195)
 - Modify: `internal/domain/decision/lean/lean_test.go` (helper `acceptedBody` line 18; rewrite `TestValidate_InvariantWithoutWhyWarns` line 89 and interim `TestValidate_RoutedDefaultWithoutWhyWarns` line 109; add a hard-issue helper)
 
 **Interfaces:**
-- Consumes: `sectionEmpty(p, "why")`, `filledSection(p, "why")`, `inForce(status)`, `ParseBody`, existing `add`/`warn` closures in `validateOne`.
-- Produces: an accepted record with an empty/absent `## Why` yields a non-warning `Issue` whose message contains `missing or empty required section: Why`; a proposed record without a filled `Why` yields a warning `Issue` whose message contains `no Why yet`.
+- Consumes: `sectionEmpty(p, "why")`, `filledSection(p, "why")`, `inForce(status)`, `ParseBody`, existing `add`/`warn` closures in `validateOne`; `Brief`, `BriefWhole`, `briefRec` test helper.
+- Produces: `briefEntry(r Record, route routeResult, includeCompanions bool) string` (the `includeWhy` parameter is removed); no brief mode contains the substring `**Why:**`. An accepted record with an empty/absent `## Why` yields a non-warning `Issue` whose message contains `missing or empty required section: Why`; a proposed record without a filled `Why` yields a warning `Issue` whose message contains `no Why yet`.
 
-- [ ] **Step 1: Write the failing tests.** In `internal/domain/decision/lean/lean_test.go`, add a hard-issue helper after `hasIssue` (line 49), then replace both the `TestValidate_InvariantWithoutWhyWarns` (lines 89–98) and the interim `routedRec`/`TestValidate_RoutedDefaultWithoutWhyWarns` (lines 100–123) blocks with the tiered matrix:
+#### Part A — strip `Why` from the brief renderer
+
+- [ ] **Step 1: Write the failing guard test.** In `internal/domain/decision/lean/brief_corpus_test.go`, add a test that an invariant with a populated `Why` never renders `**Why:**` in any brief mode. Use the existing `briefRec` helper (see other tests in this file for its signature):
+
+```go
+func TestBrief_NeverRendersWhy(t *testing.T) {
+	inv := briefRec("0001", "0001-x.md", "invariant", []string{"internal/**/*.go"},
+		"# T\n\n## Decision\n\nWe do X.\n\n## Guidance\n\n- do x\n\n## Why\n\nBecause Z breaks otherwise.\n")
+	recs := []Record{inv}
+	paths := []string{"internal/foo.go"}
+	for name, out := range map[string]string{
+		"file-scoped": Brief(recs, paths, BriefAuto),
+		"whole":       BriefWhole(recs),
+		"invariants":  BriefInvariants(recs),
+	} {
+		if strings.Contains(out, "**Why:**") || strings.Contains(out, "Because Z breaks") {
+			t.Errorf("%s brief must not render Why; got:\n%s", name, out)
+		}
+	}
+}
+```
+
+- [ ] **Step 2: Run it, verify it fails.**
+
+Run: `go test ./internal/domain/decision/lean/ -run TestBrief_NeverRendersWhy -v`
+Expected: FAIL — the invariant paths render `**Why:** Because Z breaks otherwise.`
+(If `briefRec`'s arity differs, match the signature the other tests in the file use — do not change the helper.)
+
+- [ ] **Step 3: Remove the `includeWhy` parameter and block from `briefEntry`.** In `brief.go`:
+  - Change the signature (line ~277) from `func briefEntry(r Record, route routeResult, includeWhy, includeCompanions bool) string` to `func briefEntry(r Record, route routeResult, includeCompanions bool) string`.
+  - Delete the Why-rendering block (lines ~329–335):
+
+```go
+	// Rationale is what lets an agent avoid unsafe "simplifications" of an
+	// invariant, so surface Why for invariants (only) when present.
+	if includeWhy {
+		if why := strings.TrimSpace(p.Sections["why"]); why != "" {
+			fmt.Fprintf(&b, "**Why:** %s\n\n", oneLine(why))
+		}
+	}
+```
+
+  - Update the doc comment above `briefEntry` (line ~274) to drop the `includeWhy` sentence: `// briefEntry renders one full entry. includeCompanions inlines the companion list (full`\n`// mode); compact mode passes false and aggregates companions via relatedFilesSection. Why is`\n`// never rendered — it is record-only, read from the file, never injected into a brief.`
+  - Update the three call sites to the new arity: line ~154 `briefEntry(h.rec, h.route, false)`; line ~188 `briefEntry(h.rec, h.route, !compactDefaults)`; line ~203 `briefEntry(h.rec, h.route, !compactDefaults)`.
+
+- [ ] **Step 4: Run the guard test + package, verify green.**
+
+Run: `go test ./internal/domain/decision/lean/ -run TestBrief -v`
+Expected: PASS. If the compiler flags an unused `oneLine`/`fmt`/`strings` after the deletion, confirm they are still used elsewhere in `brief.go` (they are — `oneLine` renders Decision, `strings`/`fmt` are used throughout) and leave the imports.
+
+#### Part B — validator: `## Why` is a required section
+
+- [ ] **Step 5: Write the failing tests.** In `internal/domain/decision/lean/lean_test.go`, add a hard-issue helper after `hasIssue` (line 49), then replace both the `TestValidate_InvariantWithoutWhyWarns` (lines 89–98) and the interim `routedRec`/`TestValidate_RoutedDefaultWithoutWhyWarns` (lines 100–123) blocks with the tiered matrix:
 
 ```go
 // hasHardIssue reports a non-warning (blocking) issue matching substr.
@@ -78,12 +132,12 @@ func TestValidate_TerminalWithoutWhyExempt(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the tests, verify they fail.**
+- [ ] **Step 6: Run the tests, verify they fail.**
 
 Run: `go test ./internal/domain/decision/lean/ -run 'TestValidate_(AcceptedWithoutWhyHardFails|ProposedWithoutWhyWarnsOnly|TerminalWithoutWhyExempt)' -v`
 Expected: FAIL — the interim code only *warns* ("routed record has no Why") and doesn't hard-fail; `hasHardIssue` finds nothing.
 
-- [ ] **Step 3: Add the hard requirement in the accepted block.** In `validate.go`, inside `if status == "accepted" {` (after the `guidanceEmpty(p)` check, ~line 165), add:
+- [ ] **Step 7: Add the hard requirement in the accepted block.** In `validate.go`, inside `if status == "accepted" {` (after the `guidanceEmpty(p)` check, ~line 165), add:
 
 ```go
 		if sectionEmpty(p, "why") {
@@ -91,7 +145,7 @@ Expected: FAIL — the interim code only *warns* ("routed record has no Why") an
 		}
 ```
 
-- [ ] **Step 4: Replace the interim Why block with the proposed-only nudge.** In `validate.go`, replace the entire interim block (the comment starting "Every routed record should carry its rationale." through its closing brace, ~lines 195–206) with:
+- [ ] **Step 8: Replace the interim Why block with the proposed-only nudge.** In `validate.go`, replace the entire interim block (the comment starting "Every routed record should carry its rationale." through its closing brace, ~lines 195–206) with:
 
 ```go
 		// Nudge a not-yet-accepted draft toward its rationale before the accepted gate
@@ -105,7 +159,7 @@ Expected: FAIL — the interim code only *warns* ("routed record has no Why") an
 		}
 ```
 
-- [ ] **Step 5: Backfill the clean-record test helper.** In `lean_test.go`, change `acceptedBody` (line 19) so the canonical clean accepted record carries a Why (this fixes every `acceptedBody`-based test that asserts a clean/zero-issue result — happy-path, supersession, amendment, vocabulary):
+- [ ] **Step 9: Backfill the clean-record test helper.** In `lean_test.go`, change `acceptedBody` (line 19) so the canonical clean accepted record carries a Why (this fixes every `acceptedBody`-based test that asserts a clean/zero-issue result — happy-path, supersession, amendment, vocabulary):
 
 ```go
 func acceptedBody(title string) string {
@@ -113,16 +167,16 @@ func acceptedBody(title string) string {
 }
 ```
 
-- [ ] **Step 6: Run the whole package, verify green.**
+- [ ] **Step 10: Run the whole package, verify green.**
 
 Run: `go test ./internal/domain/decision/lean/ -v`
 Expected: PASS. If `TestValidate_AmendmentIntegrity` or `TestValidate_SupersessionIntegrity` (both assert `len(issues) != 0`) still fail, confirm the record in question is either accepted-with-Why (via `acceptedBody`) or terminal; a lingering `no Why yet` warn on the `amended by ADR-NNNN` base is expected to be cleared because `acceptedBody` now has a Why.
 
-- [ ] **Step 7: Commit.**
+- [ ] **Step 11: Commit.**
 
 ```bash
-git add internal/domain/decision/lean/validate.go internal/domain/decision/lean/lean_test.go internal/domain/decision/lean/template.go internal/domain/decision/lean/compose_test.go
-git commit -m "feat(lean): require ## Why as a section, hard-fail on accepted
+git add internal/domain/decision/lean/brief.go internal/domain/decision/lean/brief_corpus_test.go internal/domain/decision/lean/validate.go internal/domain/decision/lean/lean_test.go internal/domain/decision/lean/template.go internal/domain/decision/lean/compose_test.go
+git commit -m "feat(lean): Why is a required, record-only section (never in a brief)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
@@ -262,8 +316,9 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
   - "When is `Why` required?" section (lines 77–82): replace body with `A `## Why` is required on every accepted record. It answers **"why does this rule exist / what breaks without it?"** — not "why is this a nice design?". For an invariant, center it on what breaks if the rule is breached or weakened. Keep it to the reason, one line.`
   - Lint-failure bullet (line 106): `An accepted record has no real `## Why` (a heading alone doesn't count).`
 
-- [ ] **Step 2: `lean-format.md` — Why row + index tier.**
-  - Line 21 `## Why` row: change `optional` → `required (accepted records)` and restate the contract: `Rationale — why the rule exists / what it protects, so a reader can generalize. Required once accepted; invariants center it on what breaks if breached.`
+- [ ] **Step 2: `lean-format.md` — Why row + priority row + index tier.**
+  - Line 21 `## Why` row: change `optional` → `required (accepted records)` and restate the contract: `Rationale — why the rule exists / what it protects, so a reader can generalize. Required once accepted; invariants center it on what breaks if breached. Record-only: never rendered into a brief.`
+  - Line 40 `priority` row: it currently says invariants are "surfaced with their `Why`" in the brief — now false. Change to: `Force in the brief: invariants are hard constraints, rendered in full (Decision + Guidance). The `Why` is record-only and never injected.`
   - Line 100 index-tier line: change `invariant-without-`Why`` to `an accepted record with no `## Why` (hard failure)`, keeping the other leanness nudges as warnings.
 
 - [ ] **Step 3: `SKILL.md` — scaffold note, section comment, self-check.**
@@ -312,9 +367,10 @@ Run:
   --status accepted --priority invariant --category "ADR formats" \
   --applies-to 'internal/domain/decision/lean/validate.go' \
   --applies-to 'internal/domain/decision/lean/template.go' \
+  --applies-to 'internal/domain/decision/lean/brief.go' \
   --date 2026-07-01
 ```
-Expected: prints the new NNNN. Then fill the scaffolded Decision / Guidance / Why in the new file — Decision: every accepted lean record must carry a `## Why`; Guidance: the validator hard-fails an accepted record without one (`validate.go`), the scaffold prompts for it (`template.go`), the brief stays record-only; Why: a rule without its reason can only be obeyed or violated, never reasoned about or generalized — the failure a growing non-author audience hits first.
+Expected: prints the new NNNN. Then fill the scaffolded Decision / Guidance / Why in the new file — Decision: every accepted lean record must carry a `## Why`, and that reasoning is record-only (never rendered into a brief). Guidance: the validator hard-fails an accepted record without a `Why` (`validate.go`); the scaffold prompts for it (`template.go`); `briefEntry` never renders `Why` (`brief.go`) so the injected brief stays Decision + Guidance only and the low-token harness behaviour is unchanged. Why: a rule without its reason can only be obeyed or violated, never reasoned about or generalized — the failure a growing non-author audience hits first; the brief stays lean because reasoning is for a human or an LLM that deliberately opens the record, not for every injection.
 
 - [ ] **Step 3: Review the new record with a subagent (ADR-0011 — adg makes no LLM call).**
 

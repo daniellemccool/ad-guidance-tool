@@ -1,7 +1,7 @@
 {
   "name": "write-adr",
-  "version": "1.3.0",
-  "description": "Architectural Decision Record skills for the adg CLI: write-madr-adr (durable MADR records), write-lean-adr (authoring lean records), and follow-adr-governance (obeying lean ADR briefs while changing code). Bundles Claude Code hooks: the whole-corpus brief at SessionStart, invariants at Plan-subagent dispatch, the per-session-deduped file-scoped brief before an edit, a staged-file advisory before a git commit that blocks on a forbidden-scope hit, a guard that blocks hand-creating an ADR record (and warns on editing one), a commit-time agent that reviews whether the staged code complies with the ADRs governing the touched files, and a FileChanged agent that reviews a changed ADR record against the lean rubric (requires adg on PATH). Ships with ad-guidance-tool so the guidance tracks the tool's CLI in lockstep.",
+  "version": "1.4.0",
+  "description": "Architectural Decision Record skills for the adg CLI: write-madr-adr (durable MADR records), write-lean-adr (authoring lean records), and follow-adr-governance (obeying lean ADR briefs while changing code). Bundles Claude Code hooks: a SessionStart check that prompts to update adg when the CLI lags the plugin, the whole-corpus brief at SessionStart, invariants at Plan-subagent dispatch, the per-session-deduped file-scoped brief before an edit, a staged-file advisory before a git commit that blocks on a forbidden-scope hit, a guard that blocks hand-creating an ADR record (and warns on editing one), a commit-time agent that reviews whether the staged code complies with the ADRs governing the touched files, and a FileChanged agent that reviews a changed ADR record against the lean rubric (requires adg on PATH). Ships with ad-guidance-tool so the guidance tracks the tool's CLI in lockstep.",
   "author": {
     "name": "Danielle McCool"
   },

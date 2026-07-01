@@ -28,3 +28,10 @@ islands: the lean package deliberately reuses MADR's low-level primitives (`madr
   workflow, and no MADR-only body rules imposed on lean records.
 - Keep the two skills and their references format-specific; a change that blends the workflows needs its
   own ADR.
+
+## Why
+
+The two formats differ in how a person authors and reads them, but their YAML/frontmatter parsing is
+mechanical and identical — forking it would double maintenance and let the two silently drift on plumbing
+that should never differ. Drawing the split at the user-facing layer keeps one parsing core while letting
+the authoring experiences evolve independently.

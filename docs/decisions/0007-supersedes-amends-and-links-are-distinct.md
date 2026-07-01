@@ -26,3 +26,10 @@ matches the author's actual intent.
 - Keep both ends consistent: `lean/validate.go` verifies forward + reverse integrity for supersedes and
   amends, so a relationship-bearing change must keep both ends in sync.
 - `links` must not carry supersede/amend semantics (the `Link` path already refuses supersede tags).
+
+## Why
+
+The three relationships carry different status, precedence, and force: a supersede flips the old record's
+status and retires it from routing; an amend leaves the base in force; a link changes nothing. Overloading
+one for another silently loses those semantics — the file still looks valid while the model's integrity
+quietly breaks — so the distinction has to be enforced, not left to the author's memory.

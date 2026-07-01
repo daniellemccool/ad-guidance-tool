@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh ${CLAUDE_PLUGIN_ROOT}/bin/adg-version-check.sh",
+            "command": "sh ${CLAUDE_PLUGIN_ROOT}/bin/adg-session-start.sh",
             "timeout": 30
           }
         ]
@@ -74,6 +74,17 @@
             "model": "claude-sonnet-5",
             "timeout": 120,
             "prompt": "A git commit is about to run. Assess whether the STAGED changes COMPLY with the lean ADRs governing the touched files — judge whether the code obeys the ADRs, not the ADRs' own quality. Run `git diff --cached --name-only` for the staged files, then `adg lean brief --model docs/decisions <those files>` for the ADRs that govern them (Decision/Guidance/forbids), and `git diff --cached` for the actual changes; for each governing ADR, decide whether the diff obeys its guidance. Report PASS, or a concise list of violations (ADR id · file · what's wrong · fix). Do not edit files; this is an advisory assessment."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh ${CLAUDE_PLUGIN_ROOT}/bin/adr-router.sh",
+            "timeout": 10
           }
         ]
       }

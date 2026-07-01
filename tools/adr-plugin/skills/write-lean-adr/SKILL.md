@@ -1,11 +1,11 @@
 ---
 name: write-lean-adr
 description: >
-  Create, migrate, rewrite, or review lean Architectural Decision Records for the `adg`
-  model — compact Decision/Guidance records with routing frontmatter (applies_to /
-  excludes / forbids / companions, priority). Authoring only. For durable MADR records
-  (Context / Considered Options / Decision Outcome) use write-madr-adr; for obeying an
-  injected architecture brief while changing code, use follow-adr-governance.
+  Use when creating, migrating, rewriting, or reviewing an architecture decision record
+  (ADR) in a repo using the adg lean model — including bringing older or MADR-format ADRs
+  into the lean format, editing files under docs/decisions/, or any task where an ADR is
+  authored, changed, or evaluated. For durable MADR-format records use write-madr-adr; to
+  obey an injected architecture brief while changing code use follow-adr-governance.
 ---
 
 # write-lean-adr — author lean decisions with `adg`

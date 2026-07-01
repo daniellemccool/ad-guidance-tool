@@ -210,9 +210,11 @@ comprehensive enforcement is CI / review / executable checks.
 ## Claude Code plugin (ADR skills)
 
 The [`write-adr`](./tools/adr-plugin/) plugin ships *with* `adg` so its guidance tracks the CLI in
-lockstep. It provides three skills — two for *authoring* (pick the one matching a repo's format) and one
-for *obeying* lean briefs while changing code:
+lockstep. It provides four skills — two for *authoring* (pick the one matching a repo's format), one for
+*obeying* lean briefs while changing code, and a *gateway* that routes any ADR task to the right one:
 
+- **using-write-adr** — the gateway: broadly discoverable ("Use when ADRs come up in any way"), it routes
+  ADR work to `adg` + the specific skill instead of letting the agent hand-roll it.
 - **write-madr-adr** — author durable MADR records with the `decide` / `supersede` / `revise` lifecycle.
 - **write-lean-adr** — author/migrate/rewrite/review lean records with routing frontmatter.
 - **follow-adr-governance** — a behavior primer for obeying an injected lean brief while editing code

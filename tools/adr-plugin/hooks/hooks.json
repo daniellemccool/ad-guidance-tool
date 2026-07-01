@@ -2,6 +2,16 @@
   "hooks": {
     "SessionStart": [
       {
+        "matcher": "^(startup|resume|clear|compact)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh ${CLAUDE_PLUGIN_ROOT}/bin/adg-version-check.sh",
+            "timeout": 30
+          }
+        ]
+      },
+      {
         "matcher": "^(startup|clear|compact)$",
         "hooks": [
           {

@@ -6,6 +6,7 @@ or no governing ADR, injects nothing and the action proceeds) except two deliber
 
 | When | Event · matcher | What it does |
 |---|---|---|
+| Session start | `SessionStart` · all sources | **version check**: prompt to update `adg` if it lags the plugin (else silent) |
 | Session start | `SessionStart` · startup/clear/compact | inject the **whole-corpus brief** (all in-force ADRs; invariants full, defaults condensed) once |
 | Plan dispatch | `SubagentStart` · `Plan` | inject the **invariants** into the planning subagent |
 | Before an edit | `PreToolUse` · Edit/Write/MultiEdit | inject the **file-scoped brief** (deduped per session) |

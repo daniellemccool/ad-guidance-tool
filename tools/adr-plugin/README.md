@@ -64,6 +64,10 @@ enabling the plugin registers them automatically — a repo no longer needs the 
 users). Every hook routes off the same compiled brief and needs system `adg` on `PATH` plus a
 `docs/decisions` lean model:
 
+- **SessionStart** (all sources) → `bin/adg-version-check.sh`. Compares the system `adg` on `PATH` to the
+  version this plugin ships for; when `adg` is missing or older, prints a note telling the agent to prompt
+  the user to run `install.sh`. Silent when current. (The hooks shell out to the *system* `adg`, which can
+  lag the plugin — this surfaces that instead of letting the hooks fail quietly.)
 - **SessionStart** (matcher `^(startup|clear|compact)$`) → `adg lean brief --hook --whole`. Injects the
   **whole-corpus brief** — every in-force ADR, invariants full and defaults condensed — once at session
   start, so the working agreements are in context before the first prompt. (Not on `resume`: the earlier

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh ${CLAUDE_PLUGIN_ROOT}/bin/adg-version-check.sh",
+            "command": "sh ${CLAUDE_PLUGIN_ROOT}/bin/adg-session-start.sh",
             "timeout": 30
           }
         ]

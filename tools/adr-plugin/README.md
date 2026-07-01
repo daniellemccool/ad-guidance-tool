@@ -7,9 +7,12 @@ home. The `d3i-skills` marketplace **lists** this plugin via a `git-subdir` sour
 release tag — a reference to this repo, not a copy — so there is one source of truth and nothing
 to sync.
 
-It ships three skills — two for *authoring* (pick the one matching a repo's ADR format),
-and one for *obeying* lean briefs while changing code:
+It ships four skills — a *gateway* that routes any ADR task, two for *authoring* (pick the one
+matching a repo's ADR format), and one for *obeying* lean briefs while changing code:
 
+- **using-write-adr** — the gateway: broadly discoverable ("Use when ADRs / decisions / adg come up
+  in any way"), it routes ADR work to `adg` + the specific skill below rather than hand-rolling it. It
+  is the auto-discovery front door; the UserPromptSubmit router hook is its deterministic backstop.
 - **write-madr-adr** — author durable MADR records (Context / Considered Options / Decision
   Outcome) with the `decide` / `supersede` / `revise` lifecycle.
 - **write-lean-adr** — author/migrate/rewrite/review compact lean Decision/Guidance records
@@ -64,10 +67,11 @@ enabling the plugin registers them automatically — a repo no longer needs the 
 users). Every hook routes off the same compiled brief and needs system `adg` on `PATH` plus a
 `docs/decisions` lean model:
 
-- **SessionStart** (all sources) → `bin/adg-version-check.sh`. Compares the system `adg` on `PATH` to the
-  version this plugin ships for; when `adg` is missing or older, prints a note telling the agent to prompt
-  the user to run `install.sh`. Silent when current. (The hooks shell out to the *system* `adg`, which can
-  lag the plugin — this surfaces that instead of letting the hooks fail quietly.)
+- **SessionStart** (all sources) → `bin/adg-session-start.sh`. In a governed repo (has `docs/decisions/`)
+  it **greets** every session — announcing that the write-adr governance is active and its entry points,
+  *even when the lean model is empty* (a read-only or mid-migration session meets no other hook) — and
+  **version-checks**: when the system `adg` is missing or older than the plugin, tells the agent to prompt
+  the user to run `install.sh`. Silent in ungoverned repos.
 - **UserPromptSubmit** (fires on every prompt; the script keyword-filters) → `bin/adr-router.sh`. When a
   prompt mentions ADRs / `docs/decisions` / `adg`, injects a pointer telling the agent to do ADR work
   through the write-adr skills + `adg` (author/migrate with `adg lean new`, review, or obey a brief via

@@ -6,7 +6,7 @@ or no governing ADR, injects nothing and the action proceeds) except two deliber
 
 | When | Event · matcher | What it does |
 |---|---|---|
-| Session start | `SessionStart` · all sources | **version check**: prompt to update `adg` if it lags the plugin (else silent) |
+| Session start | `SessionStart` · all sources | **greet + version check**: announce the governance (even on an empty model), and prompt to update `adg` if it lags |
 | Any ADR prompt | `UserPromptSubmit` (script filters) | **ADR router**: point the agent at the write-adr skills + `adg` when a prompt mentions ADRs (else silent) |
 | Session start | `SessionStart` · startup/clear/compact | inject the **whole-corpus brief** (all in-force ADRs; invariants full, defaults condensed) once |
 | Plan dispatch | `SubagentStart` · `Plan` | inject the **invariants** into the planning subagent |

@@ -1,16 +1,12 @@
 ---
 name: write-madr-adr
 description: >
-  Create and manage durable Architectural Decision Records (ADRs) in MADR format
-  using the `adg` CLI — full sections (Context and Problem Statement, Considered
-  Options, Decision Outcome) and the decide / supersede / revise lifecycle. Use in
-  repos whose ADRs follow the MADR shape, whenever you record, document, or revise an
-  architectural decision, capture a design choice or a rejected alternative, or are
-  asked "should this be an ADR"; also proactively after implementing a significant
-  pattern that isn't yet recorded. For lean Decision/Guidance records with routing
-  frontmatter (applies_to / excludes / forbids / companions), use the write-lean-adr
-  skill instead. Works in any repo with a `docs/decisions/` model (and bootstraps one
-  if absent).
+  Use when recording, documenting, or revising an architecture decision in a repo whose
+  ADRs use the MADR format, when capturing a design choice or a rejected alternative, when
+  asked "should this be an ADR", or proactively after implementing a significant pattern
+  that isn't yet recorded. For lean Decision/Guidance records with routing frontmatter use
+  write-lean-adr instead. Works in any repo with a docs/decisions/ model (and bootstraps
+  one if absent).
 ---
 
 # write-madr-adr — record a durable decision in MADR format with `adg`

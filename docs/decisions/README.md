@@ -17,9 +17,10 @@ Load the ADR(s) whose filename matches the area you are touching.
 
 ### ADR formats
 
-- [0004 — MADR and lean are separate user-facing formats, not implementation islands](./0004-madr-and-lean-are-separate-user-facing-formats.md)
+- ~~[0004 — MADR and lean are separate user-facing formats, not implementation islands](./0004-madr-and-lean-are-separate-user-facing-formats.md)~~ — *superseded by ADR 0016*
 - [0006 — Parser/renderer round-trip stability is an invariant](./0006-parser-renderer-round-trip-is-an-invariant.md)
 - [0014 — A lean record's reasoning is a required section, co-equal with Decision and Guidance](./0014-a-lean-record-s-reasoning-is-a-required-section-co-equal-with-decision-and-guidance.md)
+- [0016 — Lean is the sole user-facing adg ADR format; madr is shared parsing plumbing](./0016-lean-is-the-sole-user-facing-adg-adr-format-madr-is-shared-parsing-plumbing.md)
 
 ### Validation
 

@@ -56,7 +56,7 @@ or all records in the model when neither is given.`,
 			}
 
 			byID := map[string][]leandomain.Issue{}
-			for _, is := range leandomain.Validate(records) {
+			for _, is := range leandomain.ValidateWithBudget(records, budgetFor(cmd, resolved)) {
 				byID[is.ID] = append(byID[is.ID], is)
 			}
 

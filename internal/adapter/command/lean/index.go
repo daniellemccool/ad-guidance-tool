@@ -61,7 +61,7 @@ require --root.`,
 				return err
 			}
 
-			issues := leandomain.Validate(records)
+			issues := leandomain.ValidateWithBudget(records, budgetFor(cmd, resolved))
 			if root != "" {
 				lintIssues, lerr := leandomain.LintTree(records, root)
 				if lerr != nil {

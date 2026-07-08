@@ -123,7 +123,7 @@ regenerates the README. stdout is the new ID; status and warnings go to stderr.`
 			// hard failure attributable to the candidate so nothing lands on disk.
 			all := append(append([]leandomain.Record{}, records...), candidate)
 			hard := 0
-			for _, is := range leandomain.Validate(all) {
+			for _, is := range leandomain.ValidateWithBudget(all, budgetFor(cmd, resolved)) {
 				if is.ID != id {
 					continue // only the candidate's findings gate this write
 				}

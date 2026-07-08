@@ -68,7 +68,7 @@ CI/manual: the brief prints to stdout and a hard validation failure exits non-ze
 			}
 
 			// Validation issues always go to stderr (the advisory channel).
-			issues := leandomain.Validate(records)
+			issues := leandomain.ValidateWithBudget(records, budgetFor(cmd, resolved))
 			if root != "" {
 				if li, lerr := leandomain.LintTree(records, root); lerr == nil {
 					issues = append(issues, li...)

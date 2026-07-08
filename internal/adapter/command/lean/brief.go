@@ -105,7 +105,7 @@ auto rendering, so --full/--compact are invalid with --hook.`,
 			// Non-hook brief is fail-closed: surface model problems (e.g. an
 			// unsupported brace glob that would silently mis-route) to stderr rather
 			// than render a wrong brief in silence. runHook stays fail-open.
-			hard := reportLeanIssues(cmd.ErrOrStderr(), leandomain.Validate(records))
+			hard := reportLeanIssues(cmd.ErrOrStderr(), leandomain.ValidateWithBudget(records, budgetFor(cmd, resolved)))
 			fmt.Fprint(cmd.OutOrStdout(), leandomain.Brief(records, args, mode))
 			if hard > 0 {
 				return ErrLeanValidationIssues

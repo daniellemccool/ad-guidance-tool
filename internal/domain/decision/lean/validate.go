@@ -36,11 +36,16 @@ var (
 	codeSpanRe = regexp.MustCompile("`[^`]*`")
 )
 
-// Validate runs lean-shape and integrity checks across a set of ADRs. Body
-// checks (required sections, leftover scaffolding) apply only to accepted
-// records — proposed drafts are work-in-progress. Relationship integrity
-// (supersession, amendment) is checked across the whole set.
+// Validate runs lean checks under the default (one-screen) body budget.
 func Validate(records []Record) []Issue {
+	return ValidateWithBudget(records, DefaultBudget())
+}
+
+// ValidateWithBudget runs lean-shape and integrity checks under an explicit body
+// budget. The budget governs only the whole-body one-screen length nudge; every other
+// check is budget-independent. Body checks (required sections, leftover scaffolding)
+// apply only to accepted records; relationship integrity is checked across the set.
+func ValidateWithBudget(records []Record, budget Budget) []Issue {
 	var issues []Issue
 	issues = append(issues, duplicateIDIssues(records)...)
 
@@ -49,7 +54,7 @@ func Validate(records []Record) []Issue {
 		byID[r.ID] = r
 	}
 	for _, r := range records {
-		issues = append(issues, validateOne(r, byID)...)
+		issues = append(issues, validateOne(r, byID, budget)...)
 	}
 	return issues
 }
@@ -81,7 +86,7 @@ func duplicateIDIssues(records []Record) []Issue {
 	return issues
 }
 
-func validateOne(r Record, byID map[string]Record) []Issue {
+func validateOne(r Record, byID map[string]Record, budget Budget) []Issue {
 	var issues []Issue
 	add := func(msg string) { issues = append(issues, Issue{ID: r.ID, Message: msg}) }
 	warn := func(msg string) { issues = append(issues, Issue{ID: r.ID, Message: msg, Warning: true}) }
@@ -176,8 +181,10 @@ func validateOne(r Record, byID map[string]Record) []Issue {
 		}
 	}
 
-	if n := bodyLineCount(r.Body); n > MaxBodyLines {
-		warn(fmt.Sprintf("body is %d lines (> %d); a lean ADR should fit one screen — consider splitting", n, MaxBodyLines))
+	if budget.WarnWholeBody {
+		if n := bodyLineCount(r.Body); n > budget.MaxBodyLines {
+			warn(fmt.Sprintf("body is %d lines (> %d); a lean ADR should fit one screen — consider splitting", n, budget.MaxBodyLines))
+		}
 	}
 
 	// Leanness nudges (advisory). They run on records still in force and skip

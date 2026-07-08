@@ -2,11 +2,7 @@ package cmd
 
 import (
 	printer "adg/internal/adapter/printer"
-	decisiondomain "adg/internal/domain/decision"
-	modeldomain "adg/internal/domain/model"
 	configinfra "adg/internal/infrastructure/config"
-	decisioninfra "adg/internal/infrastructure/decision"
-	modelinfra "adg/internal/infrastructure/model"
 	"fmt"
 	"os"
 
@@ -47,10 +43,6 @@ func streams() printer.Streams {
 }
 
 var configSvc, configErr = configinfra.NewConfigService()
-var decisionRepo = decisioninfra.NewFileDecisionRepository()
-var modelRepo = modelinfra.NewFileModelRepository()
-var modelSvc = modeldomain.NewModelService(modelRepo, decisionRepo)
-var decisionSvc = decisiondomain.NewDecisionService(decisionRepo)
 
 func Execute() error {
 	if configErr != nil {

@@ -22,8 +22,6 @@ matching skill below before acting.
   record's decision date), validated with `adg lean index`, and reviewed against the rubric
   with `adg lean review`. Never hand-write a record file — the ADR guard hook blocks creating
   one by hand.
-- **Recording a durable MADR-format decision** (Context / Considered Options / Decision
-  Outcome) → load **write-madr-adr**.
 - **Obeying an injected architecture brief while changing code** → load
   **follow-adr-governance**; pull the brief yourself with
   `adg lean brief --model docs/decisions <paths you expect to touch>`.

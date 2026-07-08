@@ -4,8 +4,8 @@ description: >
   Use when creating, migrating, rewriting, or reviewing an architecture decision record
   (ADR) in a repo using the adg lean model — including bringing older or MADR-format ADRs
   into the lean format, editing files under docs/decisions/, or any task where an ADR is
-  authored, changed, or evaluated. For durable MADR-format records use write-madr-adr; to
-  obey an injected architecture brief while changing code use follow-adr-governance.
+  authored, changed, or evaluated. To obey an injected architecture brief while changing
+  code use follow-adr-governance.
 ---
 
 # write-lean-adr — author lean decisions with `adg`
@@ -24,8 +24,8 @@ rules, what each command enforces): `references/lean-format.md`.
 **Which model:** operate on the repo's *active* lean model — `docs/decisions/` unless it
 configures another (`adg set-config`). Other ADR-like files — a historical MADR record under
 `docs/fork-design/`, seed or template models — are **not** your model; don't route, validate, or
-author against them. Pick this skill vs write-madr-adr by the active model's format (lean
-Decision/Guidance + routing frontmatter), not by every `NNNN-*.md` in the tree.
+author against them. Identify the active model by its format (lean Decision/Guidance + routing
+frontmatter), not by every `NNNN-*.md` in the tree.
 
 ## Author: a lean record
 

@@ -7,14 +7,12 @@ home. The `d3i-skills` marketplace **lists** this plugin via a `git-subdir` sour
 release tag — a reference to this repo, not a copy — so there is one source of truth and nothing
 to sync.
 
-It ships four skills — a *gateway* that routes any ADR task, two for *authoring* (pick the one
-matching a repo's ADR format), and one for *obeying* lean briefs while changing code:
+It ships three skills — a *gateway* that routes any ADR task, one for *authoring*, and one for
+*obeying* lean briefs while changing code:
 
 - **using-write-adr** — the gateway: broadly discoverable ("Use when ADRs / decisions / adg come up
   in any way"), it routes ADR work to `adg` + the specific skill below rather than hand-rolling it. It
   is the auto-discovery front door; the UserPromptSubmit router hook is its deterministic backstop.
-- **write-madr-adr** — author durable MADR records (Context / Considered Options / Decision
-  Outcome) with the `decide` / `supersede` / `revise` lifecycle.
 - **write-lean-adr** — author/migrate/rewrite/review compact lean Decision/Guidance records
   with routing frontmatter (`applies_to` / `excludes` / `forbids` / `companions`).
 - **follow-adr-governance** — a behavior primer for obeying an injected lean ADR brief while
@@ -30,7 +28,6 @@ consuming is frequent and carried by the hook + the self-contained brief (a tiny
 ```
 tools/adr-plugin/
   .claude-plugin/plugin.json     plugin manifest
-  skills/write-madr-adr/         MADR authoring skill (SKILL.md, references, assets, evals)
   skills/write-lean-adr/         lean authoring skill (SKILL.md, references, evals)
   skills/follow-adr-governance/  obey-the-brief behavior primer (SKILL.md, evals)
 ```

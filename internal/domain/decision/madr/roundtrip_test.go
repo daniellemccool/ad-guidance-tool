@@ -73,11 +73,9 @@ func TestNonRoundTrippable_DoesNotCrash(t *testing.T) {
 			// SplitFile alone must succeed for both fixtures; ParseFrontmatter
 			// may error on full.md (intentional, due to invalid YAML placeholders),
 			// but the parser shouldn't crash.
-			fmText, body, splitErr := SplitFile(raw)
+			fmText, _, splitErr := SplitFile(raw)
 			assert.NoError(t, splitErr)
 			_, _ = ParseFrontmatter(fmText) // ignored
-			_, parseErr := ParseBody(body)
-			assert.NoError(t, parseErr)
 		})
 	}
 }

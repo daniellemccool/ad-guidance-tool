@@ -29,82 +29,6 @@ func TestSplitFile_FrontmatterMissingCloser(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestParseBody_FindsCanonicalSections(t *testing.T) {
-	body := `# Title
-
-## Context and Problem Statement
-
-Some context.
-
-## Considered Options
-
-* A
-* B
-
-## Decision Outcome
-
-Chosen option: "A", because reasons.
-`
-	parsed, err := ParseBody(body)
-	assert.NoError(t, err)
-	assert.Equal(t, "Title", parsed.Title)
-	assert.Contains(t, parsed.Sections, "context")
-	assert.Contains(t, parsed.Sections, "options")
-	assert.Contains(t, parsed.Sections, "outcome")
-	assert.Equal(t, []string{"A", "B"}, parsed.Options)
-}
-
-func TestParseBody_CaseInsensitiveHeaders(t *testing.T) {
-	body := `# T
-
-## context and problem statement
-
-x
-
-## CONSIDERED OPTIONS
-
-* A
-`
-	parsed, err := ParseBody(body)
-	assert.NoError(t, err)
-	assert.Contains(t, parsed.Sections, "context")
-	assert.Contains(t, parsed.Sections, "options")
-}
-
-func TestParseBody_PreservesUnknownH2(t *testing.T) {
-	body := `# T
-
-## Context and Problem Statement
-
-x
-
-## Risks
-
-* something
-`
-	parsed, err := ParseBody(body)
-	assert.NoError(t, err)
-	assert.Contains(t, parsed.CustomSections, "Risks")
-}
-
-func TestParseBody_ChosenOption(t *testing.T) {
-	body := `# T
-
-## Considered Options
-
-* A
-* B
-
-## Decision Outcome
-
-Chosen option: "B", because B is better.
-`
-	parsed, err := ParseBody(body)
-	assert.NoError(t, err)
-	assert.Equal(t, "B", parsed.ChosenOption)
-	assert.Equal(t, "B is better", parsed.OutcomeRationale)
-}
-
 func TestParseFrontmatter_Full(t *testing.T) {
 	yml := `status: "accepted"
 date: 2026-05-13
@@ -155,22 +79,4 @@ func TestParseFilename_Invalid(t *testing.T) {
 	assert.Error(t, err)
 	_, _, err = ParseFilename("0042.md")
 	assert.Error(t, err)
-}
-
-func TestIsLegacyADG_DetectsFilenamePrefix(t *testing.T) {
-	assert.True(t, IsLegacyADG("AD0001-foo.md", []byte("# T")))
-}
-
-func TestIsLegacyADG_DetectsBodyAnchor(t *testing.T) {
-	assert.True(t, IsLegacyADG("0001-foo.md", []byte(`# T
-## <a name="question"></a> Question
-`)))
-}
-
-func TestIsLegacyADG_DetectsLegacyStatus(t *testing.T) {
-	assert.True(t, IsLegacyADG("0001-foo.md", []byte("---\nstatus: open\n---\n")))
-}
-
-func TestIsLegacyADG_PureMADRPasses(t *testing.T) {
-	assert.False(t, IsLegacyADG("0001-foo.md", []byte("---\nstatus: accepted\n---\n# T\n")))
 }

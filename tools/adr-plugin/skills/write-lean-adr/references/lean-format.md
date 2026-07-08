@@ -22,7 +22,25 @@ enforcement-points — see the companion `lean-rubric.md`.
 | `## Checks` | optional | Concrete things to confirm (grep targets, invariants). Rolled up into the brief's "Checks to run". |
 | `## Context` / `## Alternatives` | optional | Only when load-bearing. |
 
-If it runs past ~one screen (`MaxBodyLines`), it is probably two ADRs (the validator warns).
+If it runs past ~one screen (`MaxBodyLines`), it is probably two ADRs (the validator warns) — unless the project sets `body_budget: narrative` (see "Per-project config" below).
+
+## Per-project config (`.adg.yaml`)
+
+A repo can tune the model's authoring discipline with an optional YAML file beside the
+model root — `<model-root>/.adg.yaml` (e.g. `docs/decisions/.adg.yaml`). It travels with
+the repo and is read by every `adg lean` command that validates. Absent file → all defaults.
+
+| Key | Values | Default | Effect |
+|---|---|---|---|
+| `body_budget` | `lean` \| `narrative` | `lean` | `lean` keeps the one-screen whole-body warning (`MaxBodyLines`). `narrative` relaxes **only** that warning, so the record-only `Why`/`Context`/`Alternatives` may run to a full, traditional-ADR length. The agent-facing budgets (`MaxDecisionWords`, and the compiled brief's `MaxBriefLines`) are unchanged either way — the injected brief stays low-token regardless. |
+
+```yaml
+# docs/decisions/.adg.yaml
+body_budget: narrative
+```
+
+An unknown `body_budget` value or a malformed file degrades to the default with a warning;
+it never fails the command.
 
 ## Identity
 

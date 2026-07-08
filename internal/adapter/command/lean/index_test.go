@@ -2,6 +2,7 @@ package lean
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -40,4 +41,46 @@ func TestLeanIndex_OverlapsInvalidValue(t *testing.T) {
 	if !strings.Contains(errb, "invalid --overlaps") {
 		t.Errorf("expected an 'invalid --overlaps' error; got stderr:\n%s", errb)
 	}
+}
+
+// TestLeanIndex_BodyBudgetHonorsProjectConfig is a command-level regression test
+// that `.adg.yaml`'s body_budget is actually wired into `adg index`: with no config
+// present, an over-length accepted record earns the one-screen nudge; once the
+// model root carries `body_budget: narrative`, the same record no longer does.
+// This closes the gap where the loader (budget_test.go) and the domain gate
+// (validate_test.go) are each unit-tested but nothing asserts a real command
+// connects them — reverting the ValidateWithBudget wiring would pass the suite
+// undetected without a test like this one.
+func TestLeanIndex_BodyBudgetHonorsProjectConfig(t *testing.T) {
+	overLong := "---\nstatus: accepted\ncategory: Test\n---\n\n# Long rule\n\n## Decision\n\nWe do X.\n\n## Guidance\n\n- Do Y.\n\n## Why\n\nWithout it, later code can't tell a valid change from an invalid one.\n"
+	for i := 0; i < 70; i++ {
+		overLong += fmt.Sprintf("Filler line %d to push the body well past the one-screen ceiling.\n", i)
+	}
+
+	t.Run("no config warns", func(t *testing.T) {
+		dir := t.TempDir()
+		writeADR(t, dir, "0001-long-rule.md", overLong)
+
+		_, errb, err := runIndex(t, dir)
+		if err != nil {
+			t.Fatalf("index errored: %v; stderr:\n%s", err, errb)
+		}
+		if !strings.Contains(errb, "should fit one screen") {
+			t.Errorf("expected the one-screen nudge with no .adg.yaml present; got stderr:\n%s", errb)
+		}
+	})
+
+	t.Run("narrative budget suppresses warning", func(t *testing.T) {
+		dir := t.TempDir()
+		writeADR(t, dir, "0001-long-rule.md", overLong)
+		writeConfig(t, dir, "body_budget: narrative\n")
+
+		_, errb, err := runIndex(t, dir)
+		if err != nil {
+			t.Fatalf("index errored: %v; stderr:\n%s", err, errb)
+		}
+		if strings.Contains(errb, "should fit one screen") {
+			t.Errorf("expected body_budget: narrative to suppress the one-screen nudge; got stderr:\n%s", errb)
+		}
+	})
 }

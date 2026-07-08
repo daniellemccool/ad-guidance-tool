@@ -93,10 +93,14 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 Delete the now-unused domain services, repositories, and infra, and clean the dead service wiring in `cmd/root.go`. After this, the `madr` package's MADR-body functions (`ParseBody`, `legacy.*`, `RenderNewBody`) have no remaining callers.
 
 **Files (delete):**
-- `internal/domain/decision/service.go`, `service_test.go`, `repository.go`, `mock_DecisionRepository.go`, `decision.go` (the `type Decision = madr.Decision` alias shim), `slug.go`, `slug_test.go`
+- `internal/domain/decision/service.go`, `service_test.go`, `repository.go`, `mock_DecisionRepository.go`, `decision.go` (the `type Decision = madr.Decision` alias shim)
+- `internal/application/interactor/interactorutil.go`, `interactorutil_test.go` (orphaned: `ResolveDecisionByIdOrTitle` references the deleted `decision.DecisionService`; no surviving caller)
 - `internal/domain/model/` (4 files)
 - `internal/infrastructure/decision/` (2 files), and `internal/infrastructure/model/` if it exists
 - `mocks/service/` if its contents are decision/model mocks (verify in Step 1 — keep any config mock)
+
+**Files that must SURVIVE (do NOT delete — shared with lean):**
+- `internal/domain/decision/slug.go`, `slug_test.go` — `Slugify` is called by `internal/adapter/command/lean/new.go:80`. The `package decision` survives containing only `slug.go` (plus the `madr/` and `lean/` subpackages).
 
 **Files (edit):**
 - `cmd/root.go:52-53` — remove `var modelSvc = ...` and `var decisionSvc = ...`, plus `modelRepo`/`decisionRepo` if they become unused, and the now-dead imports (`modeldomain`, `decisiondomain`, the infra decision/model packages). Keep `configSvc` (root.go:49) and everything lean/config uses.
@@ -107,24 +111,25 @@ Delete the now-unused domain services, repositories, and infra, and clean the de
 
 Run:
 ```bash
-grep -rn "decision.Decision\b\|decision.Comment\b" internal cmd | grep -v "/madr/\|/lean/"
-grep -rn "decision.Slugify\|domain/decision\".*Slug\|\.Slug(" internal cmd | grep -v _test
+grep -rn "decision.Decision\b\|decision.Comment\b\|decision.DecisionService" internal cmd | grep -v "/madr/\|/lean/"
+grep -rn "decision.Slugify" internal cmd | grep -v _test
 ls mocks/service/ 2>/dev/null && grep -rln "mocks/service" internal cmd
 grep -rn "decisiondomain\|modeldomain\|infrastructure/decision\|infrastructure/model" cmd/root.go
 ```
-Expected: the `decision.Decision`/`Comment` alias and `Slug` are used only by the files being deleted in this task (or by the already-removed Task 1 code). `mocks/service` is referenced only by removed tests (safe to delete) or is a config mock (keep). This confirms nothing surviving depends on them. If a surviving lean/config file references any, STOP — reassess.
+Expected: `decision.Slugify` is referenced by a SURVIVING lean file (`internal/adapter/command/lean/new.go:80`) — this is why `slug.go` must be kept. `decision.Decision`/`Comment`/`DecisionService` should appear only in files being deleted this task (`interactorutil.go` and the domain service files). `mocks/service` is referenced only by removed tests (safe to delete) or is a config mock (keep). If any surviving lean/config file references `decision.Decision`/`Comment`/`DecisionService` (not just `Slugify`), STOP — reassess.
 
 - [ ] **Step 2: Delete the domain + infra files**
 
 ```bash
 git rm internal/domain/decision/service.go internal/domain/decision/service_test.go \
        internal/domain/decision/repository.go internal/domain/decision/mock_DecisionRepository.go \
-       internal/domain/decision/decision.go internal/domain/decision/slug.go internal/domain/decision/slug_test.go
+       internal/domain/decision/decision.go
+git rm internal/application/interactor/interactorutil.go internal/application/interactor/interactorutil_test.go
 git rm -r internal/domain/model internal/infrastructure/decision
 # only if present / decision-model mocks (per Step 1):
 [ -d internal/infrastructure/model ] && git rm -r internal/infrastructure/model
 ```
-(Delete `mocks/service/` only if Step 1 showed it is decision/model mocks.)
+KEEP `internal/domain/decision/slug.go` and `slug_test.go` (lean uses `Slugify`). Delete `mocks/service/` only if Step 1 showed it is decision/model mocks.
 
 - [ ] **Step 3: Clean the dead service wiring in `cmd/root.go`**
 

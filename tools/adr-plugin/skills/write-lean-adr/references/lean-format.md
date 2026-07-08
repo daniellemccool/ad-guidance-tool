@@ -22,7 +22,7 @@ enforcement-points — see the companion `lean-rubric.md`.
 | `## Checks` | optional | Concrete things to confirm (grep targets, invariants). Rolled up into the brief's "Checks to run". |
 | `## Context` / `## Alternatives` | optional | Only when load-bearing. |
 
-If it runs past ~one screen (`MaxBodyLines`), it is probably two ADRs (the validator warns).
+If it runs past ~one screen (`MaxBodyLines`), it is probably two ADRs (the validator warns) — unless the project sets `body_budget: narrative` (see "Per-project config" below).
 
 ## Per-project config (`.adg.yaml`)
 

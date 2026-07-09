@@ -175,14 +175,20 @@ adg lean index || echo "model has problems"              # exit 1 when issues ex
 This split is an invariant
 ([ADR-0008](./docs/decisions/0008-route-machine-output-to-stdout-status-to-stderr.md)).
 
-## Config
+## Per-project settings (no global config)
 
-```sh
-adg set-config         # configure defaults (model path, author, etc.)
-adg reset-config       # clear all values
+`adg` keeps no global user state: an invocation's behavior is determined by the repo and the
+flags alone. The model directory is `docs/decisions` by convention; pass `--model <dir>` per
+invocation if a repo keeps its records elsewhere. A repo may tune authoring discipline with one
+version-controlled file beside its records:
+
+```yaml
+# docs/decisions/.adg.yaml
+body_budget: narrative   # lean (default) | narrative — relaxes only the one-screen nudge
 ```
 
-Config lives at `~/.adgconfig.yaml` by default; override with `--config-path`.
+Settings are advisory and fail-open, and they never change what a compiled brief injects
+([ADR-0015](./docs/decisions/0015-per-project-config-lives-in-adg-yaml-read-at-the-command-edge-and-never-changes-the-brief.md)).
 
 ## The tool's own decisions
 
@@ -202,11 +208,6 @@ Business logic lives in the domain (`internal/domain/`); commands are thin cobra
 2. Add or extend the thin cobra command at the adapter layer; route machine output to stdout, status
    to stderr.
 3. Cover with unit tests, and run `go test ./...` before pushing.
-
-The one remaining generated mock (`mocks/service/ConfigService.go`) comes from
-[mockery](https://github.com/vektra/mockery) v2.53.6 via `.mockery.yaml`:
-`env GOBIN="$HOME/.local/bin" go install github.com/vektra/mockery/v2@v2.53.6`, then run `mockery` from
-the repo root after changing the interface.
 
 ## References
 

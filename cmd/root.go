@@ -2,8 +2,6 @@ package cmd
 
 import (
 	printer "adg/internal/adapter/printer"
-	configinfra "adg/internal/infrastructure/config"
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -42,12 +40,6 @@ func streams() printer.Streams {
 	return printer.Streams{Out: os.Stdout, Err: os.Stderr, Quiet: &Quiet}
 }
 
-var configSvc, configErr = configinfra.NewConfigService()
-
 func Execute() error {
-	if configErr != nil {
-		fmt.Fprintf(os.Stderr, "failed to initialize config service: %v\n", configErr)
-		os.Exit(1)
-	}
 	return rootCmd.Execute()
 }

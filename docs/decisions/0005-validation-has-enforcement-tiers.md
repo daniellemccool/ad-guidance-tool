@@ -10,7 +10,6 @@ applies_to:
     - internal/domain/decision/lean/hookcorpus.go
     - internal/adapter/command/lean/index.go
     - internal/adapter/command/lean/brief.go
-    - internal/application/interactor/model/validate.go
 ---
 
 # Validation has enforcement tiers
@@ -24,7 +23,7 @@ the sole exception, and it blocks only on a forbidden-scope violation.
 ## Guidance
 
 - A new check must declare its tier: a **hard failure** (a non-warning `Issue` that exits `adg lean
-  index` / `adg validate` non-zero) only if a malformed model should stop CI; otherwise a **warning**
+  index` non-zero) only if a malformed model should stop CI; otherwise a **warning**
   (`Issue{Warning: true}`, printed but never blocking).
 - The injection paths (`adg lean brief --hook` → `HookContext`, `--whole` → `SessionBrief`,
   `--invariants` → `SubagentBrief`) are **fail-open**: they inject guidance or nothing and never block or

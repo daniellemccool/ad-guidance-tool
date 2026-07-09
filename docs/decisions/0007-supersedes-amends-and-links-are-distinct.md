@@ -5,7 +5,6 @@ category: Decision model
 source: docs/fork-design/0005-make-supersede-a-first-class-bidirectional-command.md
 priority: default
 applies_to:
-    - internal/domain/decision/service.go
     - internal/domain/decision/lean/validate.go
 ---
 
@@ -25,7 +24,8 @@ matches the author's actual intent.
   cross-reference with no precedence, status, or force.
 - Keep both ends consistent: `lean/validate.go` verifies forward + reverse integrity for supersedes and
   amends, so a relationship-bearing change must keep both ends in sync.
-- `links` must not carry supersede/amend semantics (the `Link` path already refuses supersede tags).
+- `links` must not carry supersede/amend semantics — a cross-reference that should flip status or
+  force is one of the other two relationships, not a link.
 
 ## Why
 

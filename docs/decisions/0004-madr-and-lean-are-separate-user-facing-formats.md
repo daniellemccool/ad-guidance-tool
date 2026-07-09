@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by ADR-0016
 date: "2026-06-29"
 category: ADR formats
 source: docs/fork-design/0001-adopt-madr-as-the-on-disk-adr-format.md

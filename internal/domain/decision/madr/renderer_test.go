@@ -7,16 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRenderNewBody_CanonicalTemplate(t *testing.T) {
-	body := RenderNewBody("Use Kafka")
-	assert.True(t, strings.HasPrefix(body, "# Use Kafka\n"))
-	assert.Contains(t, body, "## Context and Problem Statement")
-	assert.Contains(t, body, "## Decision Drivers")
-	assert.Contains(t, body, "## Considered Options")
-	assert.Contains(t, body, "## Decision Outcome")
-	assert.Contains(t, body, "### Consequences")
-}
-
 func TestRenderFile_FrontmatterAndBody(t *testing.T) {
 	d := Decision{Status: "proposed", Date: "2026-05-13", Tags: []string{"infra"}}
 	body := "# T\n\n## Context and Problem Statement\n\nx\n"

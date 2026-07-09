@@ -2,7 +2,6 @@ package lean
 
 import (
 	util "adg/internal/adapter/command"
-	domain "adg/internal/domain/config"
 	leandomain "adg/internal/domain/decision/lean"
 	"errors"
 	"fmt"
@@ -19,7 +18,7 @@ var ErrLeanValidationIssues = errors.New("lean validation issues found")
 // NewIndexCommand wires `adg index`. It validates every lean ADR and prints (or
 // writes) the category-grouped README; with --root it also runs scope lint, and
 // with --overlaps it prints the opt-in default-vs-default overlap diagnostic.
-func NewIndexCommand(config domain.ConfigService) *cobra.Command {
+func NewIndexCommand() *cobra.Command {
 	var modelPath, root, overlaps string
 	var write bool
 
@@ -50,13 +49,10 @@ require --root.`,
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 				return err
 			}
-			resolved, err := util.ResolveModelPathOrDefault(modelPath, config)
-			if err != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
-				return err
-			}
+			resolved := util.ResolveModelPath(modelPath)
 			records, err := leandomain.LoadDir(resolved)
 			if err != nil {
+				err = util.ModelLoadHint(resolved, err)
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 				return err
 			}
@@ -111,7 +107,7 @@ require --root.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (optional if configured)")
+	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (default: docs/decisions)")
 	cmd.Flags().StringVar(&root, "root", "", "Source tree root for scope lint (stale applies_to/excludes, forbids-has-files); skipped if empty")
 	cmd.Flags().BoolVar(&write, "write", false, "Write the generated index to <model>/README.md instead of stdout")
 	cmd.Flags().StringVar(&overlaps, "overlaps", "", "Default-vs-default overlap diagnostic (requires --root): summary (default) | pairs")

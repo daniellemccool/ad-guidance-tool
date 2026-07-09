@@ -1,37 +1,24 @@
 package commands
 
 import (
-	svc_mocks "adg/mocks/service"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestResolveModelPathOrDefault_WithFlagValue(t *testing.T) {
-	mockCfg := new(svc_mocks.ConfigService)
-	path, err := ResolveModelPathOrDefault("/explicit/path", mockCfg)
-	assert.NoError(t, err)
-	assert.Equal(t, "/explicit/path", path)
+func TestResolveModelPath_FlagWins(t *testing.T) {
+	assert.Equal(t, "/explicit/path", ResolveModelPath("/explicit/path"))
 }
 
-func TestResolveModelPathOrDefault_FromConfig(t *testing.T) {
-	mockCfg := new(svc_mocks.ConfigService)
-	mockCfg.On("IsLoaded").Return(true)
-	mockCfg.On("GetDefaultModelPath").Return("/default/from/config")
-
-	path, err := ResolveModelPathOrDefault("", mockCfg)
-	assert.NoError(t, err)
-	assert.Equal(t, "/default/from/config", path)
+func TestResolveModelPath_DefaultsToDocsDecisions(t *testing.T) {
+	assert.Equal(t, "docs/decisions", ResolveModelPath(""))
 }
 
-func TestResolveModelPathOrDefault_MissingAll(t *testing.T) {
-	mockCfg := new(svc_mocks.ConfigService)
-	mockCfg.On("IsLoaded").Return(false)
-
-	path, err := ResolveModelPathOrDefault("", mockCfg)
-	assert.Error(t, err)
-	assert.Empty(t, path)
-	assert.Contains(t, err.Error(), "model path must be provided")
+func TestModelLoadHint_NamesPathAndFlag(t *testing.T) {
+	err := ModelLoadHint("docs/decisions", errors.New("open docs/decisions: no such file or directory"))
+	assert.ErrorContains(t, err, `"docs/decisions"`)
+	assert.ErrorContains(t, err, "--model")
 }
 
 func TestResolveIdOrTitle_ValidID(t *testing.T) {

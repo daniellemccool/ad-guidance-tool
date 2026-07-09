@@ -1,7 +1,6 @@
 package commands
 
 import (
-	domain "adg/internal/domain/config"
 	"errors"
 	"fmt"
 	"regexp"
@@ -9,14 +8,26 @@ import (
 	"strings"
 )
 
-func ResolveModelPathOrDefault(flagValue string, config domain.ConfigService) (string, error) {
+// DefaultModelPath is the conventional lean model location. adg keeps no global
+// user state: resolution is flag-or-convention, decided per invocation.
+const DefaultModelPath = "docs/decisions"
+
+// ResolveModelPath resolves the model directory for a command: the --model flag
+// if set, else the docs/decisions convention. It never touches the filesystem —
+// `lean new` may legitimately create into a not-yet-populated model, and read
+// commands surface a load failure through ModelLoadHint instead.
+func ResolveModelPath(flagValue string) string {
 	if flagValue != "" {
-		return flagValue, nil
+		return flagValue
 	}
-	if !config.IsLoaded() || config.GetDefaultModelPath() == "" {
-		return "", fmt.Errorf("model path must be provided via --model or config")
-	}
-	return config.GetDefaultModelPath(), nil
+	return DefaultModelPath
+}
+
+// ModelLoadHint decorates a model-load failure with the resolved path and the
+// --model escape hatch, so a bare invocation outside a governed repo says what
+// was assumed and how to override it.
+func ModelLoadHint(resolved string, err error) error {
+	return fmt.Errorf("cannot load lean model at %q: %w (pass --model <dir> if the ADRs live elsewhere)", resolved, err)
 }
 
 func ResolveIdOrTitle(idOrTitle string, id, title *string) error {

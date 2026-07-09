@@ -8,7 +8,7 @@ import (
 
 func runReview(t *testing.T, dir string, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
-	cmd := NewReviewCommand(nil)
+	cmd := NewReviewCommand()
 	var out, errb bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errb)

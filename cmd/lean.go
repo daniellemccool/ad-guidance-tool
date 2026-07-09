@@ -7,7 +7,7 @@ import (
 )
 
 // Lean-format commands. Thin shells over the lean domain package; see
-// internal/adapter/command/lean for the promotion-to-full-stack note (ADR-0003).
+// internal/adapter/command/lean; commands are thin cobra adapters over the domain.
 //
 // All live under the `lean` parent, with no top-level aliases: `adg lean new`
 // (author), `adg lean brief` (compile the brief / PreToolUse hook), `adg lean
@@ -20,12 +20,12 @@ func init() {
 		Short: "Lean-format ADR commands (authoring, brief, index)",
 	}
 	leanCmd.AddCommand(
-		leancmd.NewLeanNewCommand(configSvc),
-		leancmd.NewBriefCommand(configSvc),
-		leancmd.NewIndexCommand(configSvc),
-		leancmd.NewVerifyCommand(configSvc),
-		leancmd.NewCheckCommand(configSvc),
-		leancmd.NewReviewCommand(configSvc),
+		leancmd.NewLeanNewCommand(),
+		leancmd.NewBriefCommand(),
+		leancmd.NewIndexCommand(),
+		leancmd.NewVerifyCommand(),
+		leancmd.NewCheckCommand(),
+		leancmd.NewReviewCommand(),
 	)
 	rootCmd.AddCommand(leanCmd)
 }

@@ -8,11 +8,10 @@ import (
 	"testing"
 )
 
-// runNew executes `adg lean new` against a temp model dir. config is nil — safe
-// because --model is always set, so ResolveModelPathOrDefault never touches it.
+// runNew executes `adg lean new` against a temp model dir.
 func runNew(t *testing.T, dir, stdin string, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
-	cmd := NewLeanNewCommand(nil)
+	cmd := NewLeanNewCommand()
 	var out, errb bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errb)

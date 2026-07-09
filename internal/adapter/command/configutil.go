@@ -24,7 +24,10 @@ func ResolveModelPath(flagValue string) string {
 // --model escape hatch, so a bare invocation outside a governed repo says what
 // was assumed and how to override it.
 func ModelLoadHint(resolved string, err error) error {
-	return fmt.Errorf("cannot load lean model at %q: %w (pass --model <dir> if the ADRs live elsewhere)", resolved, err)
+	if resolved == DefaultModelPath {
+		return fmt.Errorf("cannot load lean model at %q: %w (pass --model <dir> if the ADRs live elsewhere)", resolved, err)
+	}
+	return fmt.Errorf("cannot load lean model at %q: %w", resolved, err)
 }
 
 // NormalizeID accepts "22" or "0022" and returns "0022". Rejects values outside

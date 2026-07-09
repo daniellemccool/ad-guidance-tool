@@ -40,7 +40,7 @@ The upstream tool managed a single custom-Markdown format with HTML anchor tags 
 curl -fsSL https://raw.githubusercontent.com/daniellemccool/ad-guidance-tool/main/install.sh | sh
 ```
 
-Pin a version with `ADG_VERSION=v2.0.0` or change the location with `ADG_INSTALL_DIR`. Binaries for
+Pin a version with `ADG_VERSION=v3.0.0` or change the location with `ADG_INSTALL_DIR`. Binaries for
 macOS/Linux/Windows (amd64/arm64) are on the
 [Releases](https://github.com/daniellemccool/ad-guidance-tool/releases) page.
 

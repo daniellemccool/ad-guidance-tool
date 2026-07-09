@@ -9,11 +9,12 @@ Load the ADR(s) whose filename matches the area you are touching.
 
 - [0001 — Route matching is the single shared routing kernel](./0001-routematch-is-the-shared-routing-kernel.md)
 - [0002 — One canonical compiled lean renderer shared by every consumer](./0002-one-canonical-compiled-lean-renderer-shared-by-every-consumer.md)
-- [0003 — Stable commands run through the Clean Architecture stack](./0003-stable-commands-use-the-clean-architecture-stack.md)
+- ~~[0003 — Stable commands run through the Clean Architecture stack](./0003-stable-commands-use-the-clean-architecture-stack.md)~~ — *superseded by ADR 0017*
 - [0010 — Executable checks are grep assertions, not commands](./0010-executable-checks-are-grep-assertions-not-commands.md)
 - [0011 — adg makes no LLM calls; ADR review runs in a Claude Code subagent](./0011-adg-makes-no-llm-calls-review-runs-in-a-subagent.md)
 - [0012 — Routing honors record lifecycle; terminal records govern nothing](./0012-routing-honors-record-lifecycle-terminal-records-govern-nothing.md)
 - [0015 — Per-project config lives in .adg.yaml, read at the command edge, and never changes the brief](./0015-per-project-config-lives-in-adg-yaml-read-at-the-command-edge-and-never-changes-the-brief.md)
+- [0017 — Commands are thin cobra adapters over the domain](./0017-commands-are-thin-cobra-adapters-over-the-domain.md)
 
 ### ADR formats
 

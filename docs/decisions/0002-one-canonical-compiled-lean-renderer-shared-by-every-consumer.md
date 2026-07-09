@@ -26,9 +26,8 @@ from the CLI, is forbidden.
 
 - Keep the renderer in the domain (`internal/domain/decision/lean`); every consumer calls it. Do not
   copy its logic into an adapter, a presenter, a tool, or the hook.
-- The deferred promotion of the lean commands onto the Clean Architecture stack must have its presenter
-  delegate to this renderer, never reimplement formatting — this is the named thin-shell exception and
-  its promotion path.
+- The lean commands are thin adapters that delegate to this renderer (the thin-adapter rule for
+  commands); any future surface or consumer must delegate the same way, never reimplement formatting.
 - A change to the renderer changes it for every consumer at once (by construction); never add a code
   path that renders for one consumer differently from another.
 

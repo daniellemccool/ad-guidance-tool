@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by ADR-0017
 date: "2026-06-29"
 category: Architecture
 source: architecture of the initial adg implementation; models/clean is template seed data, not this decision

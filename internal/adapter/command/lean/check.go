@@ -2,7 +2,6 @@ package lean
 
 import (
 	util "adg/internal/adapter/command"
-	domain "adg/internal/domain/config"
 	leandomain "adg/internal/domain/decision/lean"
 	"fmt"
 
@@ -13,7 +12,7 @@ import (
 // the model's ADRs (frontmatter `checks` — grep assertions) against the source tree.
 // With path arguments it searches only those files (check what changed); without, the
 // whole tree under --root. A failing check exits non-zero so CI can gate on it.
-func NewCheckCommand(config domain.ConfigService) *cobra.Command {
+func NewCheckCommand() *cobra.Command {
 	var modelPath, root string
 
 	cmd := &cobra.Command{
@@ -27,13 +26,10 @@ tree under --root. Exit is non-zero if any check fails.`,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			resolved, err := util.ResolveModelPathOrDefault(modelPath, config)
-			if err != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
-				return err
-			}
+			resolved := util.ResolveModelPath(modelPath)
 			records, err := leandomain.LoadDir(resolved)
 			if err != nil {
+				err = util.ModelLoadHint(resolved, err)
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 				return err
 			}
@@ -60,7 +56,7 @@ tree under --root. Exit is non-zero if any check fails.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (optional if configured)")
+	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (default: docs/decisions)")
 	cmd.Flags().StringVar(&root, "root", ".", "Source tree root to search")
 	return cmd
 }

@@ -1,15 +1,12 @@
 // Package lean holds the cobra commands for the lean ADR format (new, brief,
-// index, verify, check, review). These are intentionally thin shells over the
-// internal/domain/decision/lean package, which already returns finished output:
-// the thin-shell shortcut is the named, time-boxed exception ADR-0003 requires,
-// and ADR-0002 governs the deferred promotion onto the full inputport/interactor/
-// presenter stack — whose presenter must delegate to the shared renderer rather
-// than reimplement it.
+// index, verify, check, review). They are thin cobra adapters over the
+// internal/domain/decision/lean package, which already returns finished output —
+// the adapters parse flags, call the domain, and pick the output stream; the
+// shared renderer is never reimplemented here.
 package lean
 
 import (
 	util "adg/internal/adapter/command"
-	domain "adg/internal/domain/config"
 	leandomain "adg/internal/domain/decision/lean"
 	"encoding/json"
 	"fmt"
@@ -26,7 +23,7 @@ import (
 // NewBriefCommand wires `adg brief`. It routes changed paths to the ADRs that
 // govern them (by applies_to) and prints the compiled guidance packet; with
 // --hook it runs as a Claude Code PreToolUse hook over stdin.
-func NewBriefCommand(config domain.ConfigService) *cobra.Command {
+func NewBriefCommand() *cobra.Command {
 	var modelPath string
 	var hook, full, compact, whole, invariants, staged, guard bool
 
@@ -72,7 +69,7 @@ auto rendering, so --full/--compact are invalid with --hook.`,
 					fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 					return err
 				}
-				return runHook(cmd, modelPath, config, whole, invariants, staged, guard)
+				return runHook(cmd, modelPath, whole, invariants, staged, guard)
 			}
 			if whole || invariants || staged || guard {
 				err := fmt.Errorf("--whole/--invariants/--staged/--guard require --hook")
@@ -87,11 +84,7 @@ auto rendering, so --full/--compact are invalid with --hook.`,
 				mode = leandomain.BriefCompact
 			}
 
-			resolved, err := util.ResolveModelPathOrDefault(modelPath, config)
-			if err != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
-				return err
-			}
+			resolved := util.ResolveModelPath(modelPath)
 			if len(args) == 0 {
 				err := fmt.Errorf("provide one or more changed paths, or use --hook")
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
@@ -99,6 +92,7 @@ auto rendering, so --full/--compact are invalid with --hook.`,
 			}
 			records, err := leandomain.LoadDir(resolved)
 			if err != nil {
+				err = util.ModelLoadHint(resolved, err)
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 				return err
 			}
@@ -114,7 +108,7 @@ auto rendering, so --full/--compact are invalid with --hook.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (optional if configured)")
+	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (default: docs/decisions)")
 	cmd.Flags().BoolVar(&hook, "hook", false, "Claude Code hook mode: read hook JSON from stdin and inject the brief (default: the edited file, PreToolUse)")
 	cmd.Flags().BoolVar(&whole, "whole", false, "Hook mode (SessionStart): inject the whole-corpus brief — every in-force ADR, once per session")
 	cmd.Flags().BoolVar(&invariants, "invariants", false, "Hook mode (SubagentStart): inject the invariants-only brief")
@@ -131,11 +125,8 @@ auto rendering, so --full/--compact are invalid with --hook.`,
 // The mode flags select which brief the hook injects: --whole (SessionStart), --invariants
 // (SubagentStart), --staged (commit-time advisory), or the default file-scoped brief
 // (PreToolUse on an edit). Rendering and routing stay in the domain (ADR-0002/0001).
-func runHook(cmd *cobra.Command, modelPath string, config domain.ConfigService, whole, invariants, staged, guard bool) error {
-	resolved, err := util.ResolveModelPathOrDefault(modelPath, config)
-	if err != nil {
-		return nil
-	}
+func runHook(cmd *cobra.Command, modelPath string, whole, invariants, staged, guard bool) error {
+	resolved := util.ResolveModelPath(modelPath)
 	payload, err := io.ReadAll(cmd.InOrStdin())
 	if err != nil {
 		return nil

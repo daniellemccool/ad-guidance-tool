@@ -6,12 +6,10 @@ import (
 	"testing"
 )
 
-// runBrief executes `adg lean brief` against a temp model dir. config is nil —
-// safe because --model is always set, and the flag-conflict errors under test fire
-// before the model is loaded.
+// runBrief executes `adg lean brief` against a temp model dir.
 func runBrief(t *testing.T, dir, stdin string, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
-	cmd := NewBriefCommand(nil)
+	cmd := NewBriefCommand()
 	var out, errb bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errb)

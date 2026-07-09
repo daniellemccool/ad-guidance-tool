@@ -2,7 +2,6 @@ package lean
 
 import (
 	util "adg/internal/adapter/command"
-	domain "adg/internal/domain/config"
 	"adg/internal/domain/decision"
 	leandomain "adg/internal/domain/decision/lean"
 	"adg/internal/domain/decision/madr"
@@ -23,7 +22,7 @@ import (
 // against the model BEFORE writing and refuses on a hard failure, so an invalid
 // record never lands on disk; on success it writes the record and regenerates the
 // README. stdout carries only the new ID; status and warnings go to stderr.
-func NewLeanNewCommand(config domain.ConfigService) *cobra.Command {
+func NewLeanNewCommand() *cobra.Command {
 	var (
 		modelPath, title, id, status, priority, category, source, date string
 		appliesTo, excludes, forbids, companions, tags                 []string
@@ -47,13 +46,10 @@ regenerates the README. stdout is the new ID; status and warnings go to stderr.`
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 				return err
 			}
-			resolved, err := util.ResolveModelPathOrDefault(modelPath, config)
-			if err != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
-				return err
-			}
+			resolved := util.ResolveModelPath(modelPath)
 			records, err := leandomain.LoadDir(resolved)
 			if err != nil {
+				err = util.ModelLoadHint(resolved, err)
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 				return err
 			}
@@ -163,7 +159,7 @@ regenerates the README. stdout is the new ID; status and warnings go to stderr.`
 		},
 	}
 
-	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (optional if configured)")
+	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (default: docs/decisions)")
 	cmd.Flags().StringVar(&title, "title", "", "Decision title — sets the H1 and the filename slug (required)")
 	cmd.Flags().StringVar(&id, "id", "", "Optional explicit ID (1-9999, zero-padded); fails if already taken")
 	cmd.Flags().StringVar(&status, "status", "proposed", "Status (proposed | accepted | rejected | deprecated)")

@@ -2,7 +2,6 @@ package lean
 
 import (
 	util "adg/internal/adapter/command"
-	domain "adg/internal/domain/config"
 	leandomain "adg/internal/domain/decision/lean"
 	"encoding/json"
 	"fmt"
@@ -23,7 +22,7 @@ import (
 // --hook runs it as a Claude Code Stop hook: advisory output to stderr, always exit
 // 0 (fail-open, never blocks stopping). Without --hook it is CI/manual: the brief
 // prints to stdout and a hard validation failure exits non-zero.
-func NewVerifyCommand(config domain.ConfigService) *cobra.Command {
+func NewVerifyCommand() *cobra.Command {
 	var modelPath, root string
 	var hook bool
 
@@ -41,19 +40,13 @@ CI/manual: the brief prints to stdout and a hard validation failure exits non-ze
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			resolved, err := util.ResolveModelPathOrDefault(modelPath, config)
-			if err != nil {
-				if hook {
-					return nil // fail-open: never break the agent's stop
-				}
-				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
-				return err
-			}
+			resolved := util.ResolveModelPath(modelPath)
 			records, err := leandomain.LoadDir(resolved)
 			if err != nil {
 				if hook {
 					return nil
 				}
+				err = util.ModelLoadHint(resolved, err)
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 				return err
 			}
@@ -119,7 +112,7 @@ CI/manual: the brief prints to stdout and a hard validation failure exits non-ze
 		},
 	}
 
-	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (optional if configured)")
+	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (default: docs/decisions)")
 	cmd.Flags().StringVar(&root, "root", ".", "Source tree root for scope lint; empty to skip")
 	cmd.Flags().BoolVar(&hook, "hook", false, "Claude Code Stop hook mode: advisory output to stderr, always exit 0 (fail-open)")
 	return cmd

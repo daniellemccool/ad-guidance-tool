@@ -21,8 +21,8 @@ meets (Decision = one rule, the first Guidance bullet load-bearing, a prohibitio
 `forbids`, scope narrowed to the enforcement points). Full format spec (frontmatter, glob
 rules, what each command enforces): `references/lean-format.md`.
 
-**Which model:** operate on the repo's *active* lean model — `docs/decisions/` unless it
-configures another (`adg set-config`). Other ADR-like files — a historical MADR record under
+**Which model:** operate on the repo's *active* lean model — `docs/decisions/` by convention
+(pass `--model <dir>` per invocation if a repo keeps its records elsewhere). Other ADR-like files — a historical MADR record under
 `docs/fork-design/`, seed or template models — are **not** your model; don't route, validate, or
 author against them. Identify the active model by its format (lean Decision/Guidance + routing
 frontmatter), not by every `NNNN-*.md` in the tree.

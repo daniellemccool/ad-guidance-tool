@@ -15,6 +15,7 @@ Load the ADR(s) whose filename matches the area you are touching.
 - [0012 — Routing honors record lifecycle; terminal records govern nothing](./0012-routing-honors-record-lifecycle-terminal-records-govern-nothing.md)
 - [0015 — Per-project config lives in .adg.yaml, read at the command edge, and never changes the brief](./0015-per-project-config-lives-in-adg-yaml-read-at-the-command-edge-and-never-changes-the-brief.md)
 - [0017 — Commands are thin cobra adapters over the domain](./0017-commands-are-thin-cobra-adapters-over-the-domain.md)
+- [0018 — adg keeps no global user state; the model path is the docs/decisions convention](./0018-adg-keeps-no-global-user-state-the-model-path-is-the-docs-decisions-convention.md)
 
 ### ADR formats
 

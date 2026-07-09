@@ -10,7 +10,7 @@ import (
 
 func runVerify(t *testing.T, dir, stdin string, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
-	cmd := NewVerifyCommand(nil)
+	cmd := NewVerifyCommand()
 	var out, errb bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errb)

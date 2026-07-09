@@ -2,7 +2,6 @@ package lean
 
 import (
 	util "adg/internal/adapter/command"
-	domain "adg/internal/domain/config"
 	leandomain "adg/internal/domain/decision/lean"
 	"adg/internal/domain/decision/madr"
 	"fmt"
@@ -22,7 +21,7 @@ import (
 //
 // Targets: explicit ADR file paths, or --since <git-ref> (records changed since that
 // ref), or all records in the model when neither is given.
-func NewReviewCommand(config domain.ConfigService) *cobra.Command {
+func NewReviewCommand() *cobra.Command {
 	var modelPath, since string
 
 	cmd := &cobra.Command{
@@ -39,13 +38,10 @@ or all records in the model when neither is given.`,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			resolved, err := util.ResolveModelPathOrDefault(modelPath, config)
-			if err != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
-				return err
-			}
+			resolved := util.ResolveModelPath(modelPath)
 			records, err := leandomain.LoadDir(resolved)
 			if err != nil {
+				err = util.ModelLoadHint(resolved, err)
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 				return err
 			}
@@ -69,7 +65,7 @@ or all records in the model when neither is given.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (optional if configured)")
+	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (default: docs/decisions)")
 	cmd.Flags().StringVar(&since, "since", "", "Review only the ADR files changed since this git ref")
 	return cmd
 }

@@ -3,16 +3,16 @@ package lean
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// runIndex executes `adg lean index` against a temp model dir. config is nil —
-// safe because --model is always set, so ResolveModelPathOrDefault never touches it
-// (and the flag-validation errors under test fire before the model is even loaded).
+// runIndex executes `adg lean index` against a temp model dir.
 func runIndex(t *testing.T, dir string, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
-	cmd := NewIndexCommand(nil)
+	cmd := NewIndexCommand()
 	var out, errb bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errb)
@@ -83,4 +83,70 @@ func TestLeanIndex_BodyBudgetHonorsProjectConfig(t *testing.T) {
 			t.Errorf("expected body_budget: narrative to suppress the one-screen nudge; got stderr:\n%s", errb)
 		}
 	})
+}
+
+func TestIndexCommand_DefaultsToDocsDecisions(t *testing.T) {
+	dir := t.TempDir()
+	model := filepath.Join(dir, "docs", "decisions")
+	if err := os.MkdirAll(model, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	record := `---
+status: accepted
+date: "2026-07-09"
+category: Test
+priority: default
+applies_to:
+    - src/**/*.go
+---
+
+# Bare invocation resolves the conventional model
+
+## Decision
+
+Test decision.
+
+## Guidance
+
+- Test guidance bullet.
+
+## Why
+
+Test why.
+`
+	if err := os.WriteFile(filepath.Join(model, "0001-bare-invocation-resolves-the-conventional-model.md"), []byte(record), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+
+	cmd := NewIndexCommand()
+	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+	cmd.SetArgs([]string{}) // no --model: must resolve to docs/decisions
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("bare `lean index` in a repo with docs/decisions must succeed; err=%v stderr=%s", err, errOut.String())
+	}
+	if !strings.Contains(out.String(), "0001") {
+		t.Fatalf("index output must list the record; got: %s", out.String())
+	}
+}
+
+func TestIndexCommand_MissingDefaultModelNamesPathAndFlag(t *testing.T) {
+	t.Chdir(t.TempDir()) // no docs/decisions here
+
+	cmd := NewIndexCommand()
+	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("bare `lean index` without docs/decisions must fail")
+	}
+	if !strings.Contains(errOut.String(), `"docs/decisions"`) || !strings.Contains(errOut.String(), "--model") {
+		t.Fatalf("error must name the resolved path and suggest --model; got: %s", errOut.String())
+	}
 }

@@ -21,10 +21,13 @@ type CheckResult struct {
 }
 
 // RunChecks runs every record's frontmatter `checks` against the tree at root. When
-// scopePaths is non-empty, only those files are searched (the "check what changed"
-// lens) — otherwise the whole tree under root. Returns one result per check, in
-// record-then-declaration order. An unparseable grep or glob surfaces as a failed
-// result (the index validator catches these earlier as hard errors).
+// scopePaths is non-empty, absence checks search only those files (the "check what
+// changed" lens); `expect: present` checks always evaluate their full declared
+// in/except scope, because existence is a global invariant that narrowing would
+// invert. Without scopePaths, everything runs against the whole tree under root.
+// Returns one result per check, in record-then-declaration order. An unparseable
+// grep or glob surfaces as a failed result (the index validator catches these
+// earlier as hard errors).
 func RunChecks(records []Record, root string, scopePaths []string) ([]CheckResult, error) {
 	files, err := listFiles(root)
 	if err != nil {
@@ -56,10 +59,21 @@ func runOneCheck(r Record, c madr.Check, files []string, root string, scope map[
 		res.Detail = "invalid grep regexp: " + err.Error()
 		return res
 	}
+	expect := strings.TrimSpace(c.Expect)
+	if expect == "" {
+		expect = "absent"
+	}
+
 	in := compileGlobs(c.In)
 	except := compileGlobs(c.Except)
 	inScope := func(f string) bool {
-		if scope != nil && !scope[f] {
+		// The changed-files lens narrows only absence checks: unchanged files were
+		// compliant at the last commit, so searching the change set is exact and
+		// cheap. A "present" check asserts existence — a global invariant — and
+		// must always evaluate its full declared in/except scope; narrowed to a
+		// change set that doesn't contain its file, it would fail unconditionally
+		// (and a commit deleting the required file would slip through unchecked).
+		if expect != "present" && scope != nil && !scope[f] {
 			return false
 		}
 		if len(in) > 0 && !anyMatch(in, f) {
@@ -83,10 +97,6 @@ func runOneCheck(r Record, c madr.Check, files []string, root string, scope map[
 	}
 	sort.Strings(hits)
 
-	expect := strings.TrimSpace(c.Expect)
-	if expect == "" {
-		expect = "absent"
-	}
 	switch expect {
 	case "present":
 		if len(hits) == 0 {

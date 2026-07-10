@@ -57,9 +57,44 @@ func TestRunChecks_PresentAndScope(t *testing.T) {
 	if r, _ := RunChecks([]Record{rec}, root, nil); r[0].Failed {
 		t.Errorf("present check should pass against the whole tree; got %+v", r)
 	}
-	// Scoped to a.py: fails (a.py lacks it) — the "check what I changed" lens.
-	if r, _ := RunChecks([]Record{rec}, root, []string{"a.py"}); !r[0].Failed {
-		t.Errorf("present check scoped to a.py should fail; got %+v", r)
+	// A present check asserts existence — a global invariant — so the changed-files
+	// lens must not narrow it: b.py still satisfies it when only a.py changed.
+	if r, _ := RunChecks([]Record{rec}, root, []string{"a.py"}); r[0].Failed {
+		t.Errorf("present check must ignore path narrowing (existence is global); got %+v", r)
+	}
+}
+
+func TestRunChecks_PresentUnderScopeStillEvaluatesFullScope(t *testing.T) {
+	// The pattern is missing from the whole tree: a present check must FAIL even
+	// when the changed set doesn't touch its scope — evaluated, never skipped.
+	root := writeContentTree(t, map[string]string{"release.sh": "echo build\n", "other.txt": "x\n"})
+	rec := Record{ID: "0004", D: madr.Decision{Checks: []madr.Check{{
+		Desc: "release.sh builds per-platform", Grep: "VITE_PLATFORM",
+		In: []string{"release.sh"}, Expect: "present",
+	}}}}
+
+	r, _ := RunChecks([]Record{rec}, root, []string{"other.txt"})
+	if !r[0].Failed {
+		t.Errorf("present check must still evaluate (and fail) under narrowing when the pattern is gone; got %+v", r)
+	}
+	if r[0].Detail == "" {
+		t.Errorf("failed present check should carry a detail; got %+v", r)
+	}
+}
+
+func TestRunChecks_AbsentKeepsChangedFilesNarrowing(t *testing.T) {
+	// Absence checks keep the lens: a violation in an UNCHANGED file is not
+	// re-reported when only a.py is in the change set.
+	root := writeContentTree(t, map[string]string{"a.py": "import safe\n", "b.py": "danger here\n"})
+	rec := Record{ID: "0003", D: madr.Decision{Checks: []madr.Check{{
+		Desc: "no danger anywhere", Grep: "danger",
+	}}}}
+
+	if r, _ := RunChecks([]Record{rec}, root, []string{"a.py"}); r[0].Failed {
+		t.Errorf("absent check narrowed to a.py should pass (violation lives in unchanged b.py); got %+v", r)
+	}
+	if r, _ := RunChecks([]Record{rec}, root, []string{"b.py"}); !r[0].Failed {
+		t.Errorf("absent check narrowed to b.py should fail; got %+v", r)
 	}
 }
 

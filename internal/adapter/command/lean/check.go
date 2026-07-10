@@ -10,8 +10,10 @@ import (
 
 // NewCheckCommand wires `adg lean check`: it runs the executable checks declared in
 // the model's ADRs (frontmatter `checks` — grep assertions) against the source tree.
-// With path arguments it searches only those files (check what changed); without, the
-// whole tree under --root. A failing check exits non-zero so CI can gate on it.
+// With path arguments, absence checks search only those files (check what changed)
+// while `expect: present` checks still evaluate their full declared scope — existence
+// is a global invariant that narrowing would invert. Without paths, the whole tree
+// under --root. A failing check exits non-zero so CI can gate on it.
 func NewCheckCommand() *cobra.Command {
 	var modelPath, root string
 
@@ -21,8 +23,11 @@ func NewCheckCommand() *cobra.Command {
 		Long: `Check runs the frontmatter "checks" of every lean ADR against the source tree.
 Each check is a grep assertion: a regexp that must be absent (the default — a violation if
 it matches anywhere in scope) or present, within the check's in/except globs. With path
-arguments it searches only those files (the "check what I changed" lens); without, the whole
-tree under --root. Exit is non-zero if any check fails.`,
+arguments, absence checks search only those files (the "check what I changed" lens), while
+"expect: present" checks always evaluate their full declared scope — existence is a global
+invariant, so it can neither false-fail on an unrelated change nor slip through when the
+required file is deleted. Without paths, everything runs against the whole tree under
+--root. Exit is non-zero if any check fails.`,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {

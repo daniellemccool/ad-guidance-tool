@@ -92,7 +92,11 @@ checks:
 ```
 
 `expect: absent` fails if `grep` matches anywhere in scope (a violation); `present` fails if it
-matches nowhere. `adg lean index` hard-fails a check with no `grep` or a bad regexp.
+matches nowhere. Under the changed-files lens (`adg lean check <paths>`, e.g. the staged-files
+commit gate), only absence checks narrow to the given paths; a `present` check always evaluates
+its full `in`/`except` scope — existence is a global invariant, so narrowing it would fail every
+commit that doesn't touch the required file. `adg lean index` hard-fails a check with no `grep`
+or a bad regexp.
 
 ## Glob rules
 
@@ -119,7 +123,7 @@ Routing is **advisory**; enforcement is the index/lint/checks layer. "No brief a
 | `adg lean index` | **hard gate** | Duplicate ID and brace glob (hard); an accepted record missing a required section — Decision, Guidance, or `## Why` (hard); glob-hygiene, over-length body, missing category, and leanness nudges — Decision-as-list / over-length, Guidance-without-a-bullet (warn; advisory, skipped on terminal records and scaffold placeholders — see `lean-rubric.md`); status vocabulary and supersede/amend integrity. |
 | `adg lean index --root <tree>` | **hard gate + scope lint** | All of the above, plus: stale `applies_to`/`excludes` (match nothing) and `forbids` that now matches a file. |
 | `adg lean index --root <tree> --overlaps[=pairs]` | advisory **diagnostic** (opt-in) | Default-vs-default scope overlap (computed on `applies_to` minus `excludes`), as an `[info]` block — grouped per-hub summary, or `=pairs` for per-pair detail. Never a failure; off by default because benign overlap floods CI. |
-| `adg lean check [paths]` | **hard gate** (code-level) | Runs the frontmatter `checks` (grep assertions) against the tree; a failed assertion exits non-zero. With paths, searches only those files ("check what changed"). |
+| `adg lean check [paths]` | **hard gate** (code-level) | Runs the frontmatter `checks` (grep assertions) against the tree; a failed assertion exits non-zero. With paths, absence checks search only those files ("check what changed"); `expect: present` checks always evaluate their full declared scope. |
 | `adg lean verify [--hook]` | advisory (Stop hook) / **gate** (CLI) | Re-runs validation + scope lint + `checks` and re-renders the brief footer for changed files. `--hook` is fail-open (exit 0, never blocks stopping); without it, a hard finding exits non-zero. |
 | `adg lean review [--since ref]` | advisory (packet) | Emits a deterministic review packet (target ADRs + their lint findings) for a Claude Code subagent to judge against the rubric. `adg` makes no LLM call and needs no API key (ADR-0011); the judging uses the session's model access. |
 | `## Checks` (prose) | manual | Human checks rolled into the brief footer; the automatable ones move to frontmatter `checks`. |

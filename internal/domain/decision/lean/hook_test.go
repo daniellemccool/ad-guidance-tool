@@ -91,6 +91,18 @@ func payloadSession(cwd, filePath, session string) []byte {
 	return b
 }
 
+func payloadSessionAgent(cwd, filePath, session, agent string) []byte {
+	in := map[string]any{
+		"session_id": session,
+		"agent_id":   agent,
+		"cwd":        cwd,
+		"tool_name":  "Edit",
+		"tool_input": map[string]any{"file_path": filePath},
+	}
+	b, _ := json.Marshal(in)
+	return b
+}
+
 // isolateHookCache points os.UserCacheDir at a temp dir so per-session dedup state
 // stays off the real cache and each test starts from a clean slate.
 func isolateHookCache(t *testing.T) {
@@ -140,6 +152,37 @@ func TestHookContext_NoSessionIDNeverDedups(t *testing.T) {
 	p := payload("/repo", "/repo/port/x.py") // no session_id
 	if HookContext(hookRecords(), p) == "" || HookContext(hookRecords(), p) == "" {
 		t.Error("without a session_id every edit should inject (no dedup)")
+	}
+}
+
+func TestHookContext_SubagentInjectsDespiteParentDedup(t *testing.T) {
+	isolateHookCache(t)
+	if HookContext(hookRecords(), payloadSession("/repo", "/repo/port/x.py", "S1")) == "" {
+		t.Fatal("main-loop first edit should inject")
+	}
+	if HookContext(hookRecords(), payloadSessionAgent("/repo", "/repo/port/x.py", "S1", "A1")) == "" {
+		t.Error("a subagent is a fresh context: its first edit should inject even though the main loop already saw the ADR")
+	}
+}
+
+func TestHookContext_SubagentDedupsWithinItself(t *testing.T) {
+	isolateHookCache(t)
+	p := payloadSessionAgent("/repo", "/repo/port/x.py", "S1", "A1")
+	if HookContext(hookRecords(), p) == "" {
+		t.Fatal("subagent first edit should inject")
+	}
+	if out := HookContext(hookRecords(), p); out != "" {
+		t.Errorf("a subagent's repeated edit should dedup within its own scope, got:\n%s", out)
+	}
+}
+
+func TestHookContext_DifferentAgentsAreIndependent(t *testing.T) {
+	isolateHookCache(t)
+	if HookContext(hookRecords(), payloadSessionAgent("/repo", "/repo/port/x.py", "S1", "A1")) == "" {
+		t.Fatal("agent A1 first edit should inject")
+	}
+	if HookContext(hookRecords(), payloadSessionAgent("/repo", "/repo/port/x.py", "S1", "A2")) == "" {
+		t.Error("a different subagent in the same session should inject independently of A1")
 	}
 }
 

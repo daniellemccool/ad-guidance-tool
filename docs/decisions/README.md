@@ -16,6 +16,8 @@ Load the ADR(s) whose filename matches the area you are touching.
 - [0015 — Per-project config lives in .adg.yaml, read at the command edge, and never changes the brief](./0015-per-project-config-lives-in-adg-yaml-read-at-the-command-edge-and-never-changes-the-brief.md)
 - [0017 — Commands are thin cobra adapters over the domain](./0017-commands-are-thin-cobra-adapters-over-the-domain.md)
 - [0018 — adg keeps no global user state; the model path is the docs/decisions convention](./0018-adg-keeps-no-global-user-state-the-model-path-is-the-docs-decisions-convention.md)
+- [0019 — A fresh context always receives its first brief](./0019-a-fresh-context-always-receives-its-first-brief.md)
+- [0020 — Agent hooks conclude with structured output and never trip a permission prompt](./0020-agent-hooks-conclude-with-structured-output-and-never-trip-a-permission-prompt.md)
 
 ### ADR formats
 

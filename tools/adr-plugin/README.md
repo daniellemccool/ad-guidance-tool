@@ -78,30 +78,39 @@ users). Every hook routes off the same compiled brief and needs system `adg` on 
   **whole-corpus brief** — every in-force ADR, invariants full and defaults condensed — once at session
   start, so the working agreements are in context before the first prompt. (Not on `resume`: the earlier
   injection is already restored.)
-- **SubagentStart** (matcher `^Plan$`) → `adg lean brief --hook --invariants`. Injects the **invariants**
-  into a `Plan` subagent as it starts designing a change. The dispatch payload carries no paths, so this
-  is the always-relevant floor, not a file-scoped brief.
+- **SubagentStart** (matcher `^Plan$`) → `adg lean brief --hook --whole`. Injects the **whole-corpus
+  brief** into a `Plan` subagent as it starts designing a change — the planner tier of the two-tier
+  subagent design. Implementer subagents get no start-time brief (the dispatch payload carries no paths);
+  they are served the targeted file-scoped brief at their first edit, below.
 - **PreToolUse** (matcher `^(Edit|Write|MultiEdit|NotebookEdit)$`) → `adg lean brief --hook`. Injects the
-  governing ADRs for the file *about to be edited*, **deduped per session** (each ADR at most once per
-  session; a forbids violation always re-surfaces).
+  governing ADRs for the file *about to be edited*, **deduped per context** — the session, or the
+  subagent within it (`session_id` + `agent_id`), so a fresh-context subagent always gets its own first
+  injection (each ADR at most once per context; a forbids violation always re-surfaces).
 - **PreToolUse** (matcher `^Bash$`) → `adg lean brief --hook --staged`. The *deterministic* commit layer:
   on a `git commit` call, briefs the **staged** files and **blocks the commit** (`permissionDecision:
   deny`) when a staged path hits a `forbids` glob — a deliberate block
   ([ADR-0005](../../docs/decisions/0005-validation-has-enforcement-tiers.md)).
-- **PreToolUse** (matcher `^Bash$`, `if: "Bash(git commit *)"`) → a **`type: agent`** hook: the
-  *code-compliance* reviewer (distinct from the ADR-quality reviewer below). Before a commit lands, it
-  assesses whether the **staged diff obeys** the ADRs governing the touched files (`git diff --cached` +
-  `adg lean brief`) and reports violations. **Advisory** — the deterministic `forbids` block above is the
-  only hard stop. Pinned to Sonnet; the commit pauses while it reviews (`if` keeps it off every Bash call).
+- **PreToolUse** (matcher `^Bash$`, `if: "Bash(git commit *)"` and a twin entry `if: "Bash(git -c *)"`
+  for flagged commits) → a **`type: agent`** hook: the *code-compliance judge* (distinct from the
+  ADR-quality reviewer below). Before a commit lands, it assesses whether the **staged diff obeys** the
+  ADRs governing the touched files (`git diff --cached` + `adg lean brief`) and concludes via its
+  structured verdict — ok=true (fail open) or ok=false with a cited violation, which **denies the
+  commit** with the reason fed back so the agent can fix and retry. Pinned to Sonnet, 60s timeout; the
+  commit pauses while it judges (`if` keeps it off every other Bash call). **Prereq:** the repo must
+  allow `Bash(adg:*)` in `permissions.allow` — the judge's subagent Bash calls consult the project
+  allowlist, and a denied call deadlocks the hook until its timeout (the SessionStart greeter warns when
+  the rule is missing).
 - **PreToolUse** (matcher `^(Edit|Write|MultiEdit)$`) → `adg lean brief --hook --guard`. Guards the ADR
   model itself: **blocks** a hand-authored *new* record (a `Write` to a not-yet-existing `NNNN-*.md`) so
   records go through `adg lean new`, and **warns** (advisory, no block) on an *edit* to an existing record
   so the write-lean-adr revise/review flow isn't deadlocked. Not deduped.
-- **FileChanged** (matcher `docs/decisions/[0-9][0-9][0-9][0-9]-*.md`) → a **`type: agent`** hook that runs
-  the ADR review agent (`adg lean review` + the lean rubric) when a record changes *on disk* — the backstop
-  for changes made **outside** Claude's Edit/Write (an external editor, git, tooling). ⚠️ **Experimental:**
-  the file watcher appears to be interactive-only (it did not fire in headless `-p` runs) and the matcher
-  glob support was not verified — confirm it in a live session via `/hooks` before relying on it.
+- **PostToolUse** (matchers `^Edit$` / `^Write$`, `if: "Edit(docs/decisions/*.md)"` /
+  `if: "Write(docs/decisions/*.md)"`) → a **`type: agent`** hook: the *ADR-quality reviewer*. After a
+  record under the model changes, it runs `adg lean review` on it, judges the record against the lean
+  rubric, and concludes ok=true (pass) or ok=false with rubric-anchored fixes fed back to the editing
+  agent. (This replaced a `FileChanged` hook: FileChanged matchers are literal filenames — no globs, and
+  relative matchers watch but never match — so they cannot express `NNNN-*.md`.) Same `Bash(adg:*)`
+  allowlist prereq as the judge.
 
 The injection hooks are **fail-open**: no system `adg`, no lean model, or any error means nothing is
 injected and the edit proceeds — so "no brief appeared" never means "no rule applies." The two blocking

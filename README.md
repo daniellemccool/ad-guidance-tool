@@ -115,11 +115,12 @@ The same compiled-brief renderer drives the CLI, the hooks, and CI
 ([ADR-0002](./docs/decisions/0002-one-canonical-compiled-lean-renderer-shared-by-every-consumer.md)):
 
 The `write-adr` plugin bundles a suite of **fail-open** hooks that route the brief across the change
-lifecycle — the whole-corpus brief at `SessionStart`, invariants at `Plan`-subagent dispatch, the deduped
-file-scoped brief before an edit, a staged-file brief before a commit — plus a **guard** that blocks
-hand-creating an ADR record and two **agent** reviewers (code-vs-ADR compliance at commit, ADR-quality on
-record change). Only two hard stops exist: a commit that stages a `forbids` violation, and hand-creating a
-record; everything else advises.
+lifecycle — the whole-corpus brief at `SessionStart` and at `Plan`-subagent dispatch, the per-context-deduped
+file-scoped brief before an edit (each fresh subagent gets its own first injection), a staged-file brief
+before a commit — plus a **guard** that blocks hand-creating an ADR record and two **agent** reviewers
+(code-vs-ADR compliance at commit, ADR-quality after a record edit). The hard stops: a commit that stages a
+`forbids` violation, hand-creating a record, and a commit the compliance judge denies with a cited
+violation; everything else advises.
 
 - **CI** runs `adg lean index --root .` for real enforcement (stale globs, duplicate IDs, brace globs,
   leanness lints). The hooks route and advise; the index gates.

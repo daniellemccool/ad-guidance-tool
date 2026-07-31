@@ -14,6 +14,13 @@ set -eu
 
 echo "This repo is governed by the write-adr plugin: architecture decisions live as lean ADRs in docs/decisions/, enforced by \`adg\` and Claude Code hooks. Entry points — pull the brief for files you'll touch (\`adg lean brief --model docs/decisions <paths>\`); author / migrate / review records with the write-lean-adr skill (\`adg lean new\`); obey an injected brief with follow-adr-governance. If the routing hooks stay silent, the lean model may not be populated yet (records need \`applies_to\` frontmatter) — bootstrap the lean records before relying on the brief."
 
+# Permission check — the agent hooks (commit judge, record review) run `adg` in a
+# subagent whose Bash calls consult the project allowlist; a denied call deadlocks the
+# hook agent until its timeout. Warn once when no adg allow rule is visible.
+if ! grep -qs '"Bash(adg' .claude/settings.json .claude/settings.local.json 2>/dev/null; then
+    echo "NOTE: the commit-compliance judge and record-review agent hooks need \`adg\` allowed for subagent Bash calls. Add \"Bash(adg:*)\" to permissions.allow in .claude/settings.json (or settings.local.json), or the judge silently times out instead of judging."
+fi
+
 # Version check.
 root="${CLAUDE_PLUGIN_ROOT:-}"
 [ -n "$root" ] || exit 0

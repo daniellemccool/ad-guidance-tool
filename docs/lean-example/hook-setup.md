@@ -9,14 +9,14 @@ or no governing ADR, injects nothing and the action proceeds) except two deliber
 | Session start | `SessionStart` · all sources | **greet + version check**: announce the governance (even on an empty model), and prompt to update `adg` if it lags |
 | Any ADR prompt | `UserPromptSubmit` (script filters) | **ADR router**: point the agent at the write-adr skills + `adg` when a prompt mentions ADRs (else silent) |
 | Session start | `SessionStart` · startup/clear/compact | inject the **whole-corpus brief** (all in-force ADRs; invariants full, defaults condensed) once |
-| Plan dispatch | `SubagentStart` · `Plan` | inject the **invariants** into the planning subagent |
-| Before an edit | `PreToolUse` · Edit/Write/MultiEdit | inject the **file-scoped brief** (deduped per session) |
+| Plan dispatch | `SubagentStart` · `Plan` | inject the **whole-corpus brief** into the planning subagent (implementers get the file-scoped brief at first edit instead) |
+| Before an edit | `PreToolUse` · Edit/Write/MultiEdit | inject the **file-scoped brief** (deduped per context: session, or subagent within it) |
 | Before a commit | `PreToolUse` · Bash | brief the **staged** files; **block** on a `forbids` hit (deterministic) |
 | ADR write/edit | `PreToolUse` · Edit/Write/MultiEdit | **guard**: **block** hand-creating a record, warn on editing one |
-| Before a commit | `PreToolUse` · Bash + `if: git commit *` | **agent**: review whether the staged code **complies** with the governing ADRs (advisory) |
-| ADR changed on disk | `FileChanged` · ADR glob | **agent**: review the changed **record** against the lean rubric |
+| Before a commit | `PreToolUse` · Bash + `if: git commit *` / `if: git -c *` | **agent judge**: deny the commit with a cited violation when the staged code breaks a governing ADR; fail open otherwise |
+| After an ADR edit | `PostToolUse` · Edit/Write + `if: docs/decisions/*.md` | **agent reviewer**: judge the changed **record** against the lean rubric, feeding fixes back |
 
-The two blocks are the commit `forbids` gate and the ADR-creation guard ([ADR-0005](../decisions/0005-validation-has-enforcement-tiers.md)); everything else advises.
+The blocks are the commit `forbids` gate, the ADR-creation guard, and a judge-denied commit ([ADR-0005](../decisions/0005-validation-has-enforcement-tiers.md)); everything else advises. The agent hooks need `Bash(adg:*)` in the repo's `permissions.allow` — a denied subagent command deadlocks the hook until its timeout.
 
 ## 1. Install adg
 
@@ -63,8 +63,10 @@ Edit/Bash payload. The `agent`/`FileChanged` hooks can only be exercised in a li
   applies."** Real enforcement is `adg lean index --root` in CI, the commit gate below, and the executable
   `## Checks`.
 - **Token cost is the point:** only matching ADRs are injected; an edit to an ungoverned file costs zero.
-  The file-scoped brief dedupes per session (each ADR at most once; a `forbids` hit always re-surfaces); the
-  whole-corpus brief fires once per session; the guard never dedupes.
+  The file-scoped brief dedupes per context — the session, or the subagent within it, so each fresh
+  subagent gets its own first injection (each ADR at most once per context; a `forbids` hit always
+  re-surfaces); the whole-corpus brief fires once per session (and once per Plan subagent); the guard
+  never dedupes.
 - **Prereq:** the model must be lean records with routing frontmatter (`applies_to`, optional
   `excludes`/`forbids`/`companions`/`priority`). See
   [`lean-format.md`](../../tools/adr-plugin/skills/write-lean-adr/references/lean-format.md).

@@ -110,7 +110,7 @@ auto rendering, so --full/--compact are invalid with --hook.`,
 
 	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (default: docs/decisions)")
 	cmd.Flags().BoolVar(&hook, "hook", false, "Claude Code hook mode: read hook JSON from stdin and inject the brief (default: the edited file, PreToolUse)")
-	cmd.Flags().BoolVar(&whole, "whole", false, "Hook mode (SessionStart): inject the whole-corpus brief — every in-force ADR, once per session")
+	cmd.Flags().BoolVar(&whole, "whole", false, "Hook mode (SessionStart, or SubagentStart for planner agents): inject the whole-corpus brief — every in-force ADR")
 	cmd.Flags().BoolVar(&invariants, "invariants", false, "Hook mode (SubagentStart): inject the invariants-only brief")
 	cmd.Flags().BoolVar(&staged, "staged", false, "Hook mode (PreToolUse on `git commit`): brief the staged files; block only on a forbidden-scope hit")
 	cmd.Flags().BoolVar(&guard, "guard", false, "Hook mode (PreToolUse on Write/Edit): guard the ADR model — block hand-creating a record, warn on editing one")
@@ -170,9 +170,12 @@ func boolCount(bs ...bool) int {
 	return n
 }
 
-// gitCommitRe detects a `git commit` invocation in a Bash command, mirroring Claude
-// Code's own detection so the advisor fires on exactly the commands that commit.
-var gitCommitRe = regexp.MustCompile(`\bgit\s+commit\b`)
+// gitCommitRe detects a `git commit` invocation in a Bash command — a heuristic,
+// fail-open trigger for the advisor, tolerating git global flags between `git` and
+// the subcommand (`git -c user.email=x -c user.name=y commit`, `git -C /repo
+// commit`, `git --no-pager commit`). Over-matching only costs a spurious advisory;
+// under-matching silently skips the commit brief, so err toward matching.
+var gitCommitRe = regexp.MustCompile(`\bgit\b(\s+-[\w-]+(=\S+|\s+\S+)?)*\s+commit\b`)
 
 // stagedAdvisory is the commit-time advisor: on a `git commit` Bash call it routes the
 // staged files to the ADRs and returns the brief (or a block on a forbidden-scope hit,

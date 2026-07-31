@@ -60,12 +60,18 @@ func TestStagedAdvisory_IgnoresNonCommitAndGarbage(t *testing.T) {
 }
 
 func TestGitCommitRe(t *testing.T) {
-	for _, c := range []string{"git commit -m x", "cd /r && git commit", "git   commit --amend"} {
+	for _, c := range []string{
+		"git commit -m x", "cd /r && git commit", "git   commit --amend",
+		"git -c user.email=a@b -c user.name=n commit -m x",
+		"git -C /repo commit",
+		"git --no-pager commit",
+		"git --git-dir=/g/.git commit",
+	} {
 		if !gitCommitRe.MatchString(c) {
 			t.Errorf("should detect a commit: %q", c)
 		}
 	}
-	for _, c := range []string{"git status", "git add .", "echo git committed"} {
+	for _, c := range []string{"git status", "git add .", "echo git committed", "git log --grep commit", "git -c a=b status"} {
 		if gitCommitRe.MatchString(c) {
 			t.Errorf("should not detect a commit: %q", c)
 		}

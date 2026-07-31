@@ -7,10 +7,13 @@ import (
 )
 
 // hookInput is the subset of a Claude Code PreToolUse hook payload we read: the
-// session id (for per-session dedup), the project root (cwd), and the file the
-// Edit/Write/MultiEdit tool is about to touch.
+// session id and agent id (together the dedup scope), the project root (cwd), and
+// the file the Edit/Write/MultiEdit tool is about to touch. agent_id is present
+// only when the hook fires inside a subagent; subagents share the parent's
+// session_id, so it is the discriminator between contexts.
 type hookInput struct {
 	SessionID string `json:"session_id"`
+	AgentID   string `json:"agent_id"`
 	CWD       string `json:"cwd"`
 	ToolInput struct {
 		FilePath string `json:"file_path"`
@@ -23,11 +26,13 @@ type hookInput struct {
 // on stdout — a `hookSpecificOutput.additionalContext` carrying the compiled brief
 // for the edited file — or "" when nothing new governs the file (inject nothing).
 //
-// It dedups per session: each governing ADR is injected at most once per Claude
-// Code session (keyed by session_id), so repeated edits to broadly-scoped files —
-// e.g. an invariant on **/*.py — don't re-pay for the same brief. A forbids
-// violation always re-surfaces (it is a fresh violation each edit), and with no
-// session_id it falls back to injecting on every edit.
+// It dedups per context: each governing ADR is injected at most once per dedup
+// scope — the main conversation (session_id) or an individual subagent
+// (session_id + agent_id) — so repeated edits to broadly-scoped files — e.g. an
+// invariant on **/*.py — don't re-pay for the same brief, while every fresh
+// subagent context still receives it once. A forbids violation always re-surfaces
+// (it is a fresh violation each edit), and with no session_id it falls back to
+// injecting on every edit.
 //
 // It is fail-open: malformed input or no match yields "" and never an error, so
 // the wrapping hook can always exit 0 and never break an edit. Only the matching
@@ -64,9 +69,16 @@ func HookContext(records []Record, payload []byte) string {
 		return ""
 	}
 
+	// The dedup scope is the context, not the session: a subagent shares the
+	// parent's session_id but is a fresh context, so its agent_id extends the key.
+	dedupKey := in.SessionID
+	if dedupKey != "" && in.AgentID != "" {
+		dedupKey += "." + in.AgentID
+	}
+
 	emit := routed
-	if in.SessionID != "" {
-		emitted := loadSessionEmitted(in.SessionID)
+	if dedupKey != "" {
+		emitted := loadSessionEmitted(dedupKey)
 		var fresh []Record
 		for _, r := range routed {
 			if dedupable[r.ID] && emitted[r.ID] {
@@ -81,7 +93,7 @@ func HookContext(records []Record, payload []byte) string {
 		for id := range dedupable {
 			emitted[id] = true
 		}
-		saveSessionEmitted(in.SessionID, emitted)
+		saveSessionEmitted(dedupKey, emitted)
 	}
 
 	return hookEnvelope("PreToolUse", Brief(emit, changed, BriefAuto))

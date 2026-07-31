@@ -10,9 +10,10 @@ import (
 	"time"
 )
 
-// hookSessionTTL bounds how long a per-session dedup record lives on disk. The
-// PreToolUse hook injects each governing ADR at most once per Claude Code session;
-// the cache file keyed by session_id is best-effort state, swept after this idle
+// hookSessionTTL bounds how long a per-context dedup record lives on disk. The
+// PreToolUse hook injects each governing ADR at most once per context — the main
+// conversation (session_id) or a subagent within it (session_id + agent_id); the
+// cache file keyed by that scope is best-effort state, swept after this idle
 // window so the cache dir doesn't accumulate dead sessions.
 const hookSessionTTL = 12 * time.Hour
 

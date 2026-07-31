@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "adg lean brief --hook --invariants --model docs/decisions",
+            "command": "adg lean brief --hook --whole --model docs/decisions",
             "timeout": 30
           }
         ]
@@ -72,8 +72,50 @@
             "type": "agent",
             "if": "Bash(git commit *)",
             "model": "claude-sonnet-5",
-            "timeout": 120,
-            "prompt": "A git commit is about to run. Assess whether the STAGED changes COMPLY with the lean ADRs governing the touched files — judge whether the code obeys the ADRs, not the ADRs' own quality. Run `git diff --cached --name-only` for the staged files, then `adg lean brief --model docs/decisions <those files>` for the ADRs that govern them (Decision/Guidance/forbids), and `git diff --cached` for the actual changes; for each governing ADR, decide whether the diff obeys its guidance. Report PASS, or a concise list of violations (ADR id · file · what's wrong · fix). Do not edit files; this is an advisory assessment."
+            "timeout": 60,
+            "continueOnBlock": true,
+            "prompt": "HARD RULES for every response you produce: never reply with plain text \u2014 every response must be either a tool call or your structured output verdict; use the Read tool to read files (never cat/sed/head); use Bash ONLY for the exact commands listed here, each in its own call, exactly as written, never chained, with nothing appended. A Bash command intercepted before it runs may be a git commit. If the intercepted command in your input JSON is not actually a `git commit` invocation, your first response is the structured output ok=true. Otherwise assess whether the STAGED changes COMPLY with the lean ADRs governing the touched files \u2014 judge whether the code obeys the ADRs, not the ADRs' own quality. Allowed Bash commands: `git diff --cached --name-only`; then `adg lean brief --model docs/decisions <staged files>`; then `git diff --cached`. Decide per governing ADR whether the diff obeys its Decision and Guidance. Finish with your structured output verdict: ok=true when the changes comply, when no ADR governs them, or when you cannot complete the assessment (fail open \u2014 never block on your own uncertainty or on tool errors); ok=false ONLY on a clear violation, with reason '<ADR id> \u00b7 <file> \u00b7 <violation> \u00b7 <fix>'. Do not edit files."
+          }
+        ]
+      },
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "agent",
+            "if": "Bash(git -c *)",
+            "model": "claude-sonnet-5",
+            "timeout": 60,
+            "continueOnBlock": true,
+            "prompt": "HARD RULES for every response you produce: never reply with plain text \u2014 every response must be either a tool call or your structured output verdict; use the Read tool to read files (never cat/sed/head); use Bash ONLY for the exact commands listed here, each in its own call, exactly as written, never chained, with nothing appended. A Bash command intercepted before it runs may be a git commit written with config flags (`git -c key=val ... commit`). If the intercepted command in your input JSON is not actually a `git commit` invocation, your first response is the structured output ok=true. Otherwise assess whether the STAGED changes COMPLY with the lean ADRs governing the touched files \u2014 judge whether the code obeys the ADRs, not the ADRs' own quality. Allowed Bash commands: `git diff --cached --name-only`; then `adg lean brief --model docs/decisions <staged files>`; then `git diff --cached`. Decide per governing ADR whether the diff obeys its Decision and Guidance. Finish with your structured output verdict: ok=true when the changes comply, when no ADR governs them, or when you cannot complete the assessment (fail open \u2014 never block on your own uncertainty or on tool errors); ok=false ONLY on a clear violation, with reason '<ADR id> \u00b7 <file> \u00b7 <violation> \u00b7 <fix>'. Do not edit files."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^Edit$",
+        "hooks": [
+          {
+            "type": "agent",
+            "if": "Edit(docs/decisions/*.md)",
+            "model": "claude-sonnet-5",
+            "timeout": 60,
+            "continueOnBlock": true,
+            "prompt": "HARD RULES for every response you produce: never reply with plain text \u2014 every response must be either a tool call or your structured output verdict; use the Read tool to read files (never cat/sed/head); use Bash ONLY for the exact commands listed here, each in its own call, exactly as written, never chained, with nothing appended. A file under docs/decisions/ was just edited (the path is in your input JSON tool_input.file_path). If that file is not a lean ADR record (NNNN-*.md), your first response is the structured output ok=true. Otherwise review the record. Allowed Bash command: `adg lean review <that file> --model docs/decisions`; then Read the lean authoring rubric it names and judge the record against it. Finish with your structured output verdict: ok=true when the record passes the rubric (or you cannot complete the review \u2014 fail open); ok=false with a concise list of specific, rubric-anchored fixes when it needs revision. Do not edit files."
+          }
+        ]
+      },
+      {
+        "matcher": "^Write$",
+        "hooks": [
+          {
+            "type": "agent",
+            "if": "Write(docs/decisions/*.md)",
+            "model": "claude-sonnet-5",
+            "timeout": 60,
+            "continueOnBlock": true,
+            "prompt": "HARD RULES for every response you produce: never reply with plain text \u2014 every response must be either a tool call or your structured output verdict; use the Read tool to read files (never cat/sed/head); use Bash ONLY for the exact commands listed here, each in its own call, exactly as written, never chained, with nothing appended. A file under docs/decisions/ was just written (the path is in your input JSON tool_input.file_path). If that file is not a lean ADR record (NNNN-*.md), your first response is the structured output ok=true. Otherwise review the record. Allowed Bash command: `adg lean review <that file> --model docs/decisions`; then Read the lean authoring rubric it names and judge the record against it. Finish with your structured output verdict: ok=true when the record passes the rubric (or you cannot complete the review \u2014 fail open); ok=false with a concise list of specific, rubric-anchored fixes when it needs revision. Do not edit files."
           }
         ]
       }
@@ -85,17 +127,6 @@
             "type": "command",
             "command": "sh ${CLAUDE_PLUGIN_ROOT}/bin/adr-router.sh",
             "timeout": 10
-          }
-        ]
-      }
-    ],
-    "FileChanged": [
-      {
-        "matcher": "docs/decisions/[0-9][0-9][0-9][0-9]-*.md",
-        "hooks": [
-          {
-            "type": "agent",
-            "prompt": "A lean ADR record under docs/decisions/ just changed on disk (the changed path is in your hook input; if unsure, check `git status --porcelain docs/decisions`). Review that record: run `adg lean review <changed file> --model docs/decisions`, read the lean authoring rubric it names, and judge the record against it. Report a pass/revise verdict with specific, rubric-anchored fixes. Do not edit files."
           }
         ]
       }

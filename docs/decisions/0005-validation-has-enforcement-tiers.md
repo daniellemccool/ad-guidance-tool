@@ -17,8 +17,9 @@ applies_to:
 ## Decision
 
 Every validation check is assigned exactly one enforcement tier — hard failure, warning, or fail-open —
-deliberately, not incidentally. Context-injection hooks are always fail-open; the commit-time advisor is
-the sole exception, and it blocks only on a forbidden-scope violation.
+deliberately, not incidentally. Context-injection hooks are always fail-open; commit time is the sole
+exception: the deterministic advisor blocks a forbidden-scope violation, and the compliance judge denies
+a clearly cited ADR violation.
 
 ## Guidance
 
@@ -28,10 +29,13 @@ the sole exception, and it blocks only on a forbidden-scope violation.
 - The injection paths (`adg lean brief --hook` → `HookContext`, `--whole` → `SessionBrief`,
   `--invariants` → `SubagentBrief`) are **fail-open**: they inject guidance or nothing and never block or
   error an edit/session/dispatch, regardless of a check's tier — even a hard-failure-tier finding.
-- The commit advisor (`--staged` → `CommitAdvisory`) is the **one deliberate block**: a staged path that
+- The commit advisor (`--staged` → `CommitAdvisory`) is the **deterministic block**: a staged path that
   hits a `forbids` glob returns a PreToolUse `permissionDecision: deny` carrying the brief; any other
   governed commit is advisory (`additionalContext`), and any parse/git error injects nothing. A block
   belongs at commit time (a whole change), never on a single edit. Enforcement otherwise is CI's job.
+- The commit-compliance judge (the plugin's `type: agent` hook) is the **judged block**: it denies only a
+  clear, cited violation of a governing ADR and concludes ok on anything less — uncertainty, tool
+  errors, or an ungoverned diff (the agent-hook discipline record covers how it must conclude).
 - `adg lean brief` (non-hook) may surface validation to stderr and exit non-zero on hard failures.
 
 ## Why

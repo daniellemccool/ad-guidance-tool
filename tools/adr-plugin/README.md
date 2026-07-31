@@ -95,7 +95,8 @@ users). Every hook routes off the same compiled brief and needs system `adg` on 
   ADR-quality reviewer below). Before a commit lands, it assesses whether the **staged diff obeys** the
   ADRs governing the touched files (`git diff --cached` + `adg lean brief`) and concludes via its
   structured verdict — ok=true (fail open) or ok=false with a cited violation, which **denies the
-  commit** with the reason fed back so the agent can fix and retry. Pinned to Sonnet, 60s timeout; the
+  commit** with the reason fed back so the agent can fix and retry. Pinned to Sonnet, 120s timeout
+  (fail-open: a timeout silently allows, so the prompt orders invariants judged first); the
   commit pauses while it judges (`if` keeps it off every other Bash call). **Prereq:** the repo must
   allow `Bash(adg:*)` in `permissions.allow` — the judge's subagent Bash calls consult the project
   allowlist, and a denied call deadlocks the hook until its timeout (the SessionStart greeter warns when

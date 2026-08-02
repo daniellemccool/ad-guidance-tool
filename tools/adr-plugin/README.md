@@ -50,7 +50,11 @@ Claude Code puts on `PATH` while the plugin is enabled, and on first use it down
 A **system `adg` on `PATH`** is still needed for any `adg` invocation that runs *outside* the skills'
 execution context: the copied-out git hook, governance hooks a target repo wires into its own
 settings, and — as of v1.3.0 — **this plugin's own bundled hooks** (`hooks/hooks.json`, below).
-Install it once with the prebuilt binary:
+When it is missing, the bundled hooks **fail loudly** (an `adg: command not found` hook error at
+session start and on tool calls) — deliberate, so the governance never degrades silently — and the
+SessionStart hook turns that noise into instructions: it shows the user this install one-liner
+directly (as a `systemMessage`) and briefs the agent to relay it. Install it once with the
+prebuilt binary:
 
 ```
 curl -fsSL https://raw.githubusercontent.com/daniellemccool/ad-guidance-tool/main/install.sh | sh
@@ -67,8 +71,9 @@ users). Every hook routes off the same compiled brief and needs system `adg` on 
 - **SessionStart** (all sources) → `bin/adg-session-start.sh`. In a governed repo (has `docs/decisions/`)
   it **greets** every session — announcing that the write-adr governance is active and its entry points,
   *even when the lean model is empty* (a read-only or mid-migration session meets no other hook) — and
-  **version-checks**: when the system `adg` is missing or older than the plugin, tells the agent to prompt
-  the user to run `install.sh`. Silent in ungoverned repos.
+  **version-checks**: when the system `adg` is missing or older than the plugin, it shows the user the
+  `install.sh` one-liner directly (a `systemMessage`) and tells the agent the hooks are idle. Silent in
+  ungoverned repos.
 - **UserPromptSubmit** (fires on every prompt; the script keyword-filters) → `bin/adr-router.sh`. When a
   prompt mentions ADRs / `docs/decisions` / `adg`, injects a pointer telling the agent to do ADR work
   through the write-adr skills + `adg` (author/migrate with `adg lean new`, review, or obey a brief via
@@ -113,9 +118,12 @@ users). Every hook routes off the same compiled brief and needs system `adg` on 
   relative matchers watch but never match — so they cannot express `NNNN-*.md`.) Same `Bash(adg:*)`
   allowlist prereq as the judge.
 
-The injection hooks are **fail-open**: no system `adg`, no lean model, or any error means nothing is
-injected and the edit proceeds — so "no brief appeared" never means "no rule applies." The two blocking
-hooks (commit `forbids`, ADR-record creation) are the deliberate exceptions.
+The injection hooks are **fail-open** with respect to the edit: no system `adg`, no lean model, or any
+error means nothing is injected and the edit proceeds — so "no brief appeared" never means "no rule
+applies." Fail-open is not fail-*silent*, though: a missing `adg` errors visibly on every hook so the
+gap gets fixed rather than ignored (the SessionStart `systemMessage` carries the fix). The two blocking
+hooks (commit `forbids`, ADR-record creation) are the deliberate exceptions to fail-open — and note
+neither can fire while `adg` is missing.
 
 Together these cover the lifecycle: **SessionStart/SubagentStart** put the rules in view at *planning*
 time, **PreToolUse** is the *edit-time* safety net, and the **commit advisor** is the last gate before a

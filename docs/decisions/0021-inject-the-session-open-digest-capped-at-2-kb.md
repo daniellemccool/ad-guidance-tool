@@ -23,7 +23,8 @@ Session open injects a distinct brief class — the digest, a grouped titles-onl
 ## Guidance
 
 - Titles are the payload: bare `NNNN` IDs, `!` invariant markers, category groups ordered like the README index, per-group scope hints — never per-record summaries, filenames, or section prose. The digest's job is recall, not instruction; full guidance stays on demand via `adg lean brief <paths>`.
-- The ladder in `digest.go` tries: full digest → invariant-only digest plus a defaults count → a fixed floor (counts + pointers). The first render within `MaxDigestBytes` wins; the floor always fits by construction, so the path never errors (fail-open per the enforcement-tiers rule).
+- The ladder in `digest.go` tries: grouped digest → flat digest (no group headers or scope hints — grouping is a bonus the budget may not afford) → invariant-only digest plus a defaults count → a fixed floor (counts + pointers). The first render within `MaxDigestBytes` wins; the floor always fits by construction, so the path never errors (fail-open per the enforcement-tiers rule).
+- Corpus tuning measures against the real renderer: `adg lean brief --digest` (non-hook) prints the digest and reports every rung's size (`DigestReport`) — never re-implement the renderer to predict fit (the one-renderer rule).
 - The ceiling is the exported const `MaxDigestBytes` in `template.go`; no project config may change it or anything the digest renders. Digest lines truncate titles at `MaxTitleRunes` runes.
 - Only the SessionStart hook consumes the digest (`adg lean brief --hook --digest`). Plan subagents keep the whole-corpus brief, and the edit/commit paths keep their routed briefs — do not point another moment at the digest without its own record.
 

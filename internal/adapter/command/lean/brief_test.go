@@ -33,6 +33,31 @@ func TestLeanBrief_ModeFlagsInvalidWithHook(t *testing.T) {
 	}
 }
 
+func TestLeanBrief_DigestRequiresHook(t *testing.T) {
+	dir := t.TempDir()
+	_, errb, err := runBrief(t, dir, "", "--digest", "x.py")
+	if err == nil {
+		t.Fatalf("--digest without --hook should error")
+	}
+	if !strings.Contains(errb, "require --hook") {
+		t.Errorf("--digest without --hook should explain the requirement; got stderr:\n%s", errb)
+	}
+}
+
+func TestLeanBrief_DigestMutuallyExclusiveWithOtherHookModes(t *testing.T) {
+	dir := t.TempDir()
+	for _, flag := range []string{"--whole", "--invariants", "--staged", "--guard"} {
+		_, errb, err := runBrief(t, dir, "{}", "--hook", "--digest", flag)
+		if err == nil {
+			t.Errorf("--digest with %s should error", flag)
+			continue
+		}
+		if !strings.Contains(errb, "mutually exclusive") {
+			t.Errorf("--digest with %s should explain the conflict; got stderr:\n%s", flag, errb)
+		}
+	}
+}
+
 func TestLeanBrief_FullAndCompactMutuallyExclusive(t *testing.T) {
 	dir := t.TempDir()
 	if _, _, err := runBrief(t, dir, "", "--full", "--compact", "x.py"); err == nil {

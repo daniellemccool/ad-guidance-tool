@@ -8,7 +8,7 @@ or no governing ADR, injects nothing and the action proceeds) except two deliber
 |---|---|---|
 | Session start | `SessionStart` · all sources | **greet + version check**: announce the governance (even on an empty model), and prompt to update `adg` if it lags |
 | Any ADR prompt | `UserPromptSubmit` (script filters) | **ADR router**: point the agent at the write-adr skills + `adg` when a prompt mentions ADRs (else silent) |
-| Session start | `SessionStart` · startup/clear/compact | inject the **whole-corpus brief** (all in-force ADRs; invariants full, defaults condensed) once |
+| Session start | `SessionStart` · startup/clear/compact | inject the **session digest** (grouped titles-only tripwire index, `!` = invariant, capped at 2 KB so it always lands inline) once |
 | Plan dispatch | `SubagentStart` · `Plan` | inject the **whole-corpus brief** into the planning subagent (implementers get the file-scoped brief at first edit instead) |
 | Before an edit | `PreToolUse` · Edit/Write/MultiEdit | inject the **file-scoped brief** (deduped per context: session, or subagent within it) |
 | Before a commit | `PreToolUse` · Bash | brief the **staged** files; **block** on a `forbids` hit (deterministic) |
@@ -65,13 +65,14 @@ Edit/Bash payload. The `agent`/`FileChanged` hooks can only be exercised in a li
 - **Token cost is the point:** only matching ADRs are injected; an edit to an ungoverned file costs zero.
   The file-scoped brief dedupes per context — the session, or the subagent within it, so each fresh
   subagent gets its own first injection (each ADR at most once per context; a `forbids` hit always
-  re-surfaces); the whole-corpus brief fires once per session (and once per Plan subagent); the guard
-  never dedupes.
+  re-surfaces); the session digest fires once per session and is ≤ 2 KB by construction; the whole-corpus
+  brief fires once per Plan subagent; the guard never dedupes.
 - **Prereq:** the model must be lean records with routing frontmatter (`applies_to`, optional
   `excludes`/`forbids`/`companions`/`priority`). See
   [`lean-format.md`](../../tools/adr-plugin/skills/write-lean-adr/references/lean-format.md).
-- **Where the logic lives:** `lean.HookContext` / `SessionBrief` / `SubagentBrief` / `CommitAdvisory` /
-  `ModelGuard` in `internal/domain/decision/lean/`; `adg lean brief --hook …` is a thin stdin/stdout shell.
+- **Where the logic lives:** `lean.HookContext` / `SessionDigest` / `SessionBrief` / `SubagentBrief` /
+  `CommitAdvisory` / `ModelGuard` in `internal/domain/decision/lean/`; `adg lean brief --hook …` is a thin
+  stdin/stdout shell.
 
 ## Commit-time enforcement gate (recommended)
 

@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "adg lean brief --hook --whole --model docs/decisions",
+            "command": "adg lean brief --hook --digest --model docs/decisions",
             "timeout": 30
           }
         ]

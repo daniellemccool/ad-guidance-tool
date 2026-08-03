@@ -16,7 +16,7 @@ enforcement-points — see the companion `lean-rubric.md`.
 
 | Section | Required | Content |
 |---|---|---|
-| `# <title>` (H1) | yes | The decision as a statement. |
+| `# <title>` (H1) | yes | The rule as a short imperative instruction (≤ `MaxTitleRunes`, ~64 — the validator warns over it). On the session digest the title is the only thing shown. |
 | `## Decision` | yes | 1–3 sentences: what was decided. |
 | `## Guidance` | yes | What the next contributor must do — what new code must do, what review rejects, the fix path. (`## Implication` is an accepted alias.) |
 | `## Why` | required (accepted) | The reasoning: why the rule exists / what it protects, so a reader can generalize. Required once accepted; invariants center it on what breaks if breached. **Record-only — never rendered into a brief.** |
@@ -33,7 +33,7 @@ the repo and is read by every `adg lean` command that validates. Absent file →
 
 | Key | Values | Default | Effect |
 |---|---|---|---|
-| `body_budget` | `lean` \| `narrative` | `lean` | `lean` keeps the one-screen whole-body warning (`MaxBodyLines`). `narrative` relaxes **only** that warning, so the record-only `Why`/`Context`/`Alternatives` may run to a full, traditional-ADR length. The agent-facing budgets (`MaxDecisionWords`, and the compiled brief's `MaxBriefLines`) are unchanged either way — the injected brief stays low-token regardless. |
+| `body_budget` | `lean` \| `narrative` | `lean` | `lean` keeps the one-screen whole-body warning (`MaxBodyLines`). `narrative` relaxes **only** that warning, so the record-only `Why`/`Context`/`Alternatives` may run to a full, traditional-ADR length. The agent-facing budgets (`MaxDecisionWords`, the compiled brief's `MaxBriefLines`, the session digest's `MaxDigestBytes`, and the title's `MaxTitleRunes`) are unchanged either way — the injected brief stays low-token regardless. |
 
 ```yaml
 # docs/decisions/.adg.yaml

@@ -47,10 +47,22 @@ its mechanically-checkable parts are enforced as advisory warnings by `adg lean 
 6. **Name the mechanism or file, not the ADR number.** Write "route donate payloads through
    `handle_donate_result()`", not "see ADR-0012". Routing surfaces the related rule, and
    numbers churn on renumber — a body that cites numbers rots.
-7. **Titles are crisp statements or prohibitions, not enumerations.** "No parallel
-   extraction architecture" — not "Single extraction: FlowBuilder + curated extraction +
-   DDP_CATEGORIES". A colon-separated list of mechanisms in the title means the ADR is
-   doing too much.
+7. **Titles are short imperative instructions.** Commit-message mood: lead with the verb and
+   state the rule as an order, in at most ~`MaxTitleRunes` (64) runes. The title is the
+   tripwire — on the session digest it is the *only* thing an agent sees, so maximize
+   instruction-per-byte: aphoristic, not vague. Mechanism and rationale belong in the body;
+   a colon-separated enumeration in the title means the ADR is doing too much, and a title
+   that names a topic instead of a rule wastes its digest slot. Before → after:
+   - "Failure classes are evidence-derived; message text lies about causes"
+     → "Derive failure classes from evidence, never message text"
+   - "Cancellation is per-request: an Arc<AtomicBool> polled by the abort callback"
+     → "Cancel per-request via a polled AtomicBool"
+   - "Artifacts are durable on disk before mark_succeeded"
+     → "Persist artifacts to disk before mark_succeeded"
+
+   Retitling an existing record **never renames its `NNNN-*.md` file** — filenames are
+   load-bearing (record pointers, other records' globs, index links). Retitle
+   opportunistically when a record is next revised; never in retroactive bulk.
 8. **State each fact once.** Decision = the rule, Guidance = what to do, Why = the reasoning
    (required). Don't repeat the same enumeration across Decision and Guidance.
 9. **For a behavioral rule, point at its test(s).** List the test that exercises the rule as
@@ -111,6 +123,9 @@ unfilled scaffold placeholders:
 
 - Decision contains a list, or runs over `MaxDecisionWords` (~60).
 - Guidance has no list item (lead with reviewable bullets).
+- The H1 title runs over `MaxTitleRunes` (~64) — the session digest shows only the title,
+  and clips it at exactly this cap. (Length is deterministic; imperative *mood* is not —
+  that is judged against rule 7 by a reviewer or `adg lean review`.)
 
 The judgment-level rules (2, 3, 5, 7, 8 and "is the first bullet load-bearing?") are not
 mechanically checkable — they are what a human reviewer or `adg lean review` weighs.

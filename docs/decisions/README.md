@@ -13,11 +13,12 @@ Load the ADR(s) whose filename matches the area you are touching.
 - [0010 — Executable checks are grep assertions, not commands](./0010-executable-checks-are-grep-assertions-not-commands.md)
 - [0011 — adg makes no LLM calls; ADR review runs in a Claude Code subagent](./0011-adg-makes-no-llm-calls-review-runs-in-a-subagent.md)
 - [0012 — Routing honors record lifecycle; terminal records govern nothing](./0012-routing-honors-record-lifecycle-terminal-records-govern-nothing.md)
-- [0015 — Per-project config lives in .adg.yaml, read at the command edge, and never changes the brief](./0015-per-project-config-lives-in-adg-yaml-read-at-the-command-edge-and-never-changes-the-brief.md)
+- [0015 — Per-project config lives in .adg.yaml, read at the command edge, and never changes the brief](./0015-per-project-config-lives-in-adg-yaml-read-at-the-command-edge-and-never-changes-the-brief.md) *(amended by ADR 0021)*
 - [0017 — Commands are thin cobra adapters over the domain](./0017-commands-are-thin-cobra-adapters-over-the-domain.md)
 - [0018 — adg keeps no global user state; the model path is the docs/decisions convention](./0018-adg-keeps-no-global-user-state-the-model-path-is-the-docs-decisions-convention.md)
 - [0019 — A fresh context always receives its first brief](./0019-a-fresh-context-always-receives-its-first-brief.md)
 - [0020 — Agent hooks conclude with structured output and never trip a permission prompt](./0020-agent-hooks-conclude-with-structured-output-and-never-trip-a-permission-prompt.md)
+- [0021 — Inject the session-open digest, capped at 2 KB](./0021-inject-the-session-open-digest-capped-at-2-kb.md)
 
 ### ADR formats
 
@@ -34,6 +35,7 @@ Load the ADR(s) whose filename matches the area you are touching.
 
 - [0007 — Supersedes, amends, and links are distinct relationships](./0007-supersedes-amends-and-links-are-distinct.md)
 - [0009 — ADR files are the only source of truth — no index or cache](./0009-adr-files-are-the-only-source-of-truth.md)
+- [0022 — Write ADR titles as short imperative instructions](./0022-write-adr-titles-as-short-imperative-instructions.md)
 
 ### CLI conventions
 

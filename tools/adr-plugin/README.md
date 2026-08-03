@@ -79,9 +79,12 @@ users). Every hook routes off the same compiled brief and needs system `adg` on 
   through the write-adr skills + `adg` (author/migrate with `adg lean new`, review, or obey a brief via
   follow-adr-governance) rather than reinventing it. This is the **deterministic** backstop for skill
   auto-discovery, which is unreliable — a grep fires it, not the model's discretion. Silent otherwise.
-- **SessionStart** (matcher `^(startup|clear|compact)$`) → `adg lean brief --hook --whole`. Injects the
-  **whole-corpus brief** — every in-force ADR, invariants full and defaults condensed — once at session
-  start, so the working agreements are in context before the first prompt. (Not on `resume`: the earlier
+- **SessionStart** (matcher `^(startup|clear|compact)$`) → `adg lean brief --hook --digest`. Injects the
+  **session digest** — a grouped titles-only tripwire index of every in-force ADR (`!` marks invariants),
+  hard-capped at 2 KB so it always lands inline instead of being spooled to a file by the hook-output
+  limit. Recall, not instruction: the titles are the payload; full guidance stays on demand
+  (`adg lean brief <paths>`, the edit-time hooks). On a large corpus the digest degrades — invariants
+  only, then a counts-and-pointers floor — but it always arrives. (Not on `resume`: the earlier
   injection is already restored.)
 - **SubagentStart** (matcher `^Plan$`) → `adg lean brief --hook --whole`. Injects the **whole-corpus
   brief** into a `Plan` subagent as it starts designing a change — the planner tier of the two-tier

@@ -2,6 +2,8 @@ package lean
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -33,14 +35,23 @@ func TestLeanBrief_ModeFlagsInvalidWithHook(t *testing.T) {
 	}
 }
 
-func TestLeanBrief_DigestRequiresHook(t *testing.T) {
+func TestLeanBrief_DigestDiagnosticMode(t *testing.T) {
+	// --digest without --hook renders the digest to stdout and the per-rung size
+	// report to stderr (the corpus-tuning diagnostic).
 	dir := t.TempDir()
-	_, errb, err := runBrief(t, dir, "", "--digest", "x.py")
-	if err == nil {
-		t.Fatalf("--digest without --hook should error")
+	record := "---\nstatus: accepted\ndate: \"2026-08-03\"\ncategory: Meta\npriority: invariant\napplies_to:\n    - src/**/*.go\n---\n\n# Keep it simple\n\n## Decision\n\nRule.\n\n## Guidance\n\n- Do it.\n\n## Why\n\nBecause drift.\n"
+	if err := os.WriteFile(filepath.Join(dir, "0001-keep-it-simple.md"), []byte(record), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(errb, "require --hook") {
-		t.Errorf("--digest without --hook should explain the requirement; got stderr:\n%s", errb)
+	out, errb, err := runBrief(t, dir, "", "--digest")
+	if err != nil {
+		t.Fatalf("--digest diagnostic mode should succeed; stderr:\n%s", errb)
+	}
+	if !strings.Contains(out, "ADR digest") || !strings.Contains(out, "!0001 Keep it simple") {
+		t.Errorf("stdout should carry the digest; got:\n%s", out)
+	}
+	if !strings.Contains(errb, "selected") || !strings.Contains(errb, "rung") {
+		t.Errorf("stderr should carry the rung report; got:\n%s", errb)
 	}
 }
 

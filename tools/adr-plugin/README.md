@@ -83,9 +83,9 @@ users). Every hook routes off the same compiled brief and needs system `adg` on 
   **session digest** — a grouped titles-only tripwire index of every in-force ADR (`!` marks invariants),
   hard-capped at 2 KB so it always lands inline instead of being spooled to a file by the hook-output
   limit. Recall, not instruction: the titles are the payload; full guidance stays on demand
-  (`adg lean brief <paths>`, the edit-time hooks). On a large corpus the digest degrades — invariants
-  only, then a counts-and-pointers floor — but it always arrives. (Not on `resume`: the earlier
-  injection is already restored.)
+  (`adg lean brief <paths>`, the edit-time hooks). On a large corpus the digest degrades — flat (group
+  headers dropped), then invariants only, then a counts-and-pointers floor — but it always arrives.
+  (Not on `resume`: the earlier injection is already restored.)
 - **SubagentStart** (matcher `^Plan$`) → `adg lean brief --hook --whole`. Injects the **whole-corpus
   brief** into a `Plan` subagent as it starts designing a change — the planner tier of the two-tier
   subagent design. Implementer subagents get no start-time brief (the dispatch payload carries no paths);

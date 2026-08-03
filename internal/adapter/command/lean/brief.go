@@ -48,8 +48,9 @@ detail (the debuggable form); --compact forces the condensed form.
 
 With --hook it runs as a Claude Code hook reading the hook JSON on stdin. By default
 (PreToolUse on an edit) it injects the brief for the edited file as additionalContext.
---digest injects the session-open digest — a grouped titles-only tripwire index of
-every in-force ADR, hard-capped at 2 KB so it always lands inline (SessionStart);
+--digest injects the session-open digest — a titles-only tripwire index of every
+in-force ADR, hard-capped at 2 KB so it always lands inline (SessionStart); without
+--hook, --digest prints the digest and reports each ladder rung's size to stderr;
 --whole injects the whole-corpus brief (SubagentStart for planner agents); --invariants
 injects the invariants-only brief (SubagentStart); --staged briefs the staged files on a git commit
 Bash call, blocking only on a forbidden-scope hit; --guard blocks hand-creating an ADR
@@ -73,8 +74,36 @@ auto rendering, so --full/--compact are invalid with --hook.`,
 				}
 				return runHook(cmd, modelPath, digest, whole, invariants, staged, guard)
 			}
-			if digest || whole || invariants || staged || guard {
-				err := fmt.Errorf("--digest/--whole/--invariants/--staged/--guard require --hook")
+			// --digest without --hook is the diagnostic mode: render the digest to
+			// stdout and report every ladder rung's size to stderr, so an author
+			// tuning a corpus toward a richer rung can see the gap instead of
+			// guessing (or re-implementing the renderer, forbidden per ADR-0002).
+			if digest {
+				resolved := util.ResolveModelPath(modelPath)
+				records, err := leandomain.LoadDir(resolved)
+				if err != nil {
+					err = util.ModelLoadHint(resolved, err)
+					fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
+					return err
+				}
+				hard := reportLeanIssues(cmd.ErrOrStderr(), leandomain.ValidateWithBudget(records, budgetFor(cmd, resolved)))
+				for _, r := range leandomain.DigestReport(records) {
+					state := "over budget"
+					if r.Selected {
+						state = "selected"
+					} else if r.Fits {
+						state = "fits"
+					}
+					fmt.Fprintf(cmd.ErrOrStderr(), "rung %-15s %5d bytes (budget %d) — %s\n", r.Name, r.Bytes, leandomain.MaxDigestBytes, state)
+				}
+				fmt.Fprint(cmd.OutOrStdout(), leandomain.BriefDigest(records))
+				if hard > 0 {
+					return ErrLeanValidationIssues
+				}
+				return nil
+			}
+			if whole || invariants || staged || guard {
+				err := fmt.Errorf("--whole/--invariants/--staged/--guard require --hook")
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 				return err
 			}
@@ -112,7 +141,7 @@ auto rendering, so --full/--compact are invalid with --hook.`,
 
 	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (default: docs/decisions)")
 	cmd.Flags().BoolVar(&hook, "hook", false, "Claude Code hook mode: read hook JSON from stdin and inject the brief (default: the edited file, PreToolUse)")
-	cmd.Flags().BoolVar(&digest, "digest", false, "Hook mode (SessionStart): inject the session-open digest — grouped titles-only tripwire index, capped at 2 KB")
+	cmd.Flags().BoolVar(&digest, "digest", false, "With --hook (SessionStart): inject the session-open digest — titles-only tripwire index, capped at 2 KB. Without --hook: print the digest and report every ladder rung's size to stderr")
 	cmd.Flags().BoolVar(&whole, "whole", false, "Hook mode (SubagentStart for planner agents): inject the whole-corpus brief — every in-force ADR")
 	cmd.Flags().BoolVar(&invariants, "invariants", false, "Hook mode (SubagentStart): inject the invariants-only brief")
 	cmd.Flags().BoolVar(&staged, "staged", false, "Hook mode (PreToolUse on `git commit`): brief the staged files; block only on a forbidden-scope hit")

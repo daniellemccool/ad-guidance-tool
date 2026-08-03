@@ -6,15 +6,66 @@ import (
 	"strings"
 )
 
-// BriefDigest compiles the session-open digest (ADR-0021): a grouped, titles-only
-// tripwire index of every in-force record, hard-capped at MaxDigestBytes. The digest
-// is a recall layer, not an instruction layer — the title is the payload, and full
+// BriefDigest compiles the session-open digest (ADR-0021): a titles-only tripwire
+// index of every in-force record, hard-capped at MaxDigestBytes. The digest is a
+// recall layer, not an instruction layer — the title is the payload, and full
 // guidance stays on demand (`adg lean brief <paths>`, the edit-time hooks). A
-// degradation ladder guarantees the cap: full digest, then invariant-only digest
-// plus a defaults count, then a fixed floor of counts and pointers. Fail-open —
-// empty when no in-force records exist, and never an error. Pure rendering: no
-// path routing happens here (routing stays in route.go per ADR-0001).
+// degradation ladder guarantees the cap: the grouped digest, then the flat digest
+// (no group headers — grouping is a bonus the budget may not afford), then the
+// invariant-only digest plus a defaults count, then a fixed floor of counts and
+// pointers. Fail-open — empty when no in-force records exist, and never an error.
+// Pure rendering: no path routing happens here (routing stays in route.go per
+// ADR-0001).
 func BriefDigest(records []Record) string {
+	for _, c := range digestLadder(records) {
+		if c.out != "" && len(c.out) <= MaxDigestBytes {
+			return c.out
+		}
+	}
+	return ""
+}
+
+// DigestRung is one ladder rung's outcome in a DigestReport: its rendered size,
+// whether it fits MaxDigestBytes, and whether the ladder selects it.
+type DigestRung struct {
+	Name     string
+	Bytes    int
+	Fits     bool
+	Selected bool
+}
+
+// DigestReport renders every ladder rung and reports each one's size against
+// MaxDigestBytes, marking the rung BriefDigest selects. It exists so an author
+// tuning a corpus toward a richer rung can see how far each rung overshoots
+// instead of guessing (or re-implementing the renderer — forbidden per ADR-0002).
+// Nil for an empty corpus.
+func DigestReport(records []Record) []DigestRung {
+	cands := digestLadder(records)
+	if len(cands) == 0 {
+		return nil
+	}
+	report := make([]DigestRung, 0, len(cands))
+	selected := false
+	for _, c := range cands {
+		fits := c.out != "" && len(c.out) <= MaxDigestBytes
+		r := DigestRung{Name: c.name, Bytes: len(c.out), Fits: fits}
+		if fits && !selected {
+			r.Selected = true
+			selected = true
+		}
+		report = append(report, r)
+	}
+	return report
+}
+
+type digestCandidate struct {
+	name string
+	out  string
+}
+
+// digestLadder renders every rung in degradation order. The floor is last and
+// always fits by construction; an empty corpus yields no candidates.
+func digestLadder(records []Record) []digestCandidate {
 	var live, invs []Record
 	for _, r := range records {
 		if !inForce(r.D.Status) {
@@ -26,19 +77,18 @@ func BriefDigest(records []Record) string {
 		}
 	}
 	if len(live) == 0 {
-		return ""
+		return nil
 	}
 	total, invCount := len(live), len(invs)
 
-	if out := renderDigest(live, total, invCount, false); len(out) <= MaxDigestBytes {
-		return out
+	cands := []digestCandidate{
+		{"grouped", renderDigest(live, total, invCount, false)},
+		{"flat", renderDigestFlat(live, total, invCount)},
 	}
 	if invCount > 0 {
-		if out := renderDigest(invs, total, invCount, true); len(out) <= MaxDigestBytes {
-			return out
-		}
+		cands = append(cands, digestCandidate{"invariants-only", renderDigest(invs, total, invCount, true)})
 	}
-	return digestFloor(total, invCount)
+	return append(cands, digestCandidate{"floor", digestFloor(total, invCount)})
 }
 
 func digestInvariant(r Record) bool {
@@ -109,6 +159,24 @@ func renderDigest(recs []Record, total, invariants int, invariantOnly bool) stri
 	}
 	if invariantOnly && total > invariants {
 		fmt.Fprintf(&b, "\nPlus %d defaults & conventions — see docs/decisions/README.md.\n", total-invariants)
+	}
+	return b.String()
+}
+
+// renderDigestFlat renders the flat rung: the contract line and every record as
+// one ID-ordered list — no group headers, no scope hints. Header overhead scales
+// with category count, not record count, and can cost a fifth of the budget on a
+// finely-categorized corpus; the flat rung keeps every record visible where the
+// grouped rung would otherwise force the ladder down to invariants only.
+func renderDigestFlat(recs []Record, total, invariants int) string {
+	sorted := append([]Record{}, recs...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].ID < sorted[j].ID })
+
+	var b strings.Builder
+	b.WriteString(digestContract(total, invariants))
+	b.WriteString("\n")
+	for _, r := range sorted {
+		b.WriteString(digestLine(r))
 	}
 	return b.String()
 }

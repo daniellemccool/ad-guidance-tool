@@ -115,7 +115,10 @@ func TestBriefDigest_InvariantOnlyRung(t *testing.T) {
 			fmt.Sprintf("Follow convention %04d as the default", i), nil))
 	}
 	if full := renderDigest(recs, 95, 15, false); len(full) <= MaxDigestBytes {
-		t.Fatalf("setup: full digest should exceed the budget, got %d bytes", len(full))
+		t.Fatalf("setup: grouped digest should exceed the budget, got %d bytes", len(full))
+	}
+	if flat := renderDigestFlat(recs, 95, 15); len(flat) <= MaxDigestBytes {
+		t.Fatalf("setup: flat digest should exceed the budget, got %d bytes", len(flat))
 	}
 
 	out := BriefDigest(recs)
@@ -132,6 +135,79 @@ func TestBriefDigest_InvariantOnlyRung(t *testing.T) {
 	}
 	if !strings.Contains(out, "Plus 80 defaults & conventions — see docs/decisions/README.md.") {
 		t.Errorf("missing defaults-count closing line:\n%s", out)
+	}
+}
+
+func TestBriefDigest_FlatRung(t *testing.T) {
+	// A finely-categorized corpus: header overhead pushes the grouped rung over
+	// budget while the same records rendered flat fit. Every record its own
+	// category — the pathological version of what consolidation can't fully fix.
+	var recs []Record
+	for i := 1; i <= 30; i++ {
+		recs = append(recs, digestRec(fmt.Sprintf("%04d", i), "accepted",
+			map[bool]string{true: "invariant", false: "default"}[i%2 == 0],
+			fmt.Sprintf("Category number %02d", i),
+			fmt.Sprintf("Keep rule %04d short, imperative, and tight", i),
+			[]string{fmt.Sprintf("src/area%02d/**/*.go", i)}))
+	}
+	if grouped := renderDigest(recs, 30, 15, false); len(grouped) <= MaxDigestBytes {
+		t.Fatalf("setup: grouped digest should exceed the budget, got %d bytes", len(grouped))
+	}
+
+	out := BriefDigest(recs)
+	if len(out) > MaxDigestBytes {
+		t.Fatalf("digest is %d bytes (> %d)", len(out), MaxDigestBytes)
+	}
+	// Flat rung: every record visible, invariant markers kept, no headers/hints.
+	for i := 1; i <= 30; i++ {
+		if !strings.Contains(out, fmt.Sprintf("%04d ", i)) {
+			t.Errorf("record %04d missing from flat rung:\n%s", i, out)
+		}
+	}
+	if !strings.Contains(out, " !0002 ") || strings.Contains(out, " !0001 ") {
+		t.Errorf("invariant markers wrong on flat rung:\n%s", out)
+	}
+	if strings.Contains(out, "CATEGORY NUMBER") || strings.Contains(out, "(src/area") {
+		t.Errorf("flat rung must not render group headers or scope hints:\n%s", out)
+	}
+	if strings.Contains(out, "Plus ") {
+		t.Errorf("flat rung must not carry the invariant-only closing line:\n%s", out)
+	}
+}
+
+func TestDigestReport_SizesAndSelection(t *testing.T) {
+	// Small corpus: grouped fits and is selected; every rung reports a size.
+	small := digestCorpus(4)
+	report := DigestReport(small)
+	if len(report) != 4 {
+		t.Fatalf("expected 4 rungs (grouped, flat, invariants-only, floor), got %+v", report)
+	}
+	if report[0].Name != "grouped" || !report[0].Selected {
+		t.Errorf("small corpus should select the grouped rung: %+v", report)
+	}
+	for _, r := range report {
+		if r.Bytes <= 0 {
+			t.Errorf("rung %s reports no size: %+v", r.Name, report)
+		}
+	}
+	if !report[len(report)-1].Fits {
+		t.Errorf("the floor must always fit: %+v", report)
+	}
+	// Exactly one rung selected, and it matches what BriefDigest returns.
+	selected := ""
+	for _, r := range report {
+		if r.Selected {
+			if selected != "" {
+				t.Fatalf("two rungs selected: %+v", report)
+			}
+			selected = r.Name
+		}
+	}
+	if selected != "grouped" || len(BriefDigest(small)) != report[0].Bytes {
+		t.Errorf("selection disagrees with BriefDigest: %+v", report)
+	}
+	if DigestReport(nil) != nil {
+		t.Errorf("empty corpus should report nil")
 	}
 }
 

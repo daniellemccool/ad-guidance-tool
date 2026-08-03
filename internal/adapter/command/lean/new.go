@@ -172,7 +172,6 @@ regenerates the README. stdout is the new ID; status and warnings go to stderr.`
 	cmd.Flags().StringArrayVar(&companions, "companions", nil, "Companion glob (repeatable)")
 	cmd.Flags().StringArrayVar(&tags, "tag", nil, "Tag (repeatable)")
 	cmd.Flags().BoolVar(&fromStdin, "from-stdin", false, "Read the body (Decision/Guidance/...) from stdin; the H1 is set from --title")
-	cmd.Flags().StringVar(&date, "date", "", "Override the record date (default: today)")
-	_ = cmd.Flags().MarkHidden("date")
+	cmd.Flags().StringVar(&date, "date", "", "Record date YYYY-MM-DD (default: today) — preserves the original date when migrating an ADR")
 	return cmd
 }

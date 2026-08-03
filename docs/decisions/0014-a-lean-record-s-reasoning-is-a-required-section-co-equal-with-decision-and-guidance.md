@@ -6,6 +6,7 @@ applies_to:
     - internal/domain/decision/lean/validate.go
     - internal/domain/decision/lean/template.go
     - internal/domain/decision/lean/brief.go
+    - internal/domain/decision/lean/digest.go
 priority: invariant
 ---
 
@@ -19,7 +20,7 @@ Every accepted lean record must carry a `## Why`, and that reasoning is record-o
 
 - `validate.go` hard-fails an accepted record with no `## Why` (the same tier as a missing Decision); a not-yet-accepted draft only warns.
 - `template.go` scaffolds `## Why` for every new record, so `adg lean new --status accepted` refuses a record whose reasoning is unfilled.
-- `brief.go` never renders `## Why` in any mode — the brief stays Decision + Guidance only, so injection cost is unchanged.
+- No brief renderer (`brief.go`, `digest.go`) renders `## Why` in any mode — a brief stays Decision + Guidance only (the digest, titles only), so injection cost is unchanged.
 
 ## Why
 

@@ -5,6 +5,7 @@ source: lean tool pass — the shared-renderer boundary, made explicit
 category: Architecture
 applies_to:
     - internal/domain/decision/lean/brief.go
+    - internal/domain/decision/lean/digest.go
     - internal/domain/decision/lean/index.go
     - internal/domain/decision/lean/hook.go
     - internal/adapter/command/lean/**/*.go
@@ -16,8 +17,8 @@ priority: invariant
 
 ## Decision
 
-There is exactly one compiled lean brief/index renderer — `lean.Brief`, `lean.RenderIndex`, and
-`lean.HookContext` in `internal/domain/decision/lean` — shared, unchanged, by every consumer: the `adg`
+There is exactly one compiled lean brief/index renderer — `lean.Brief`, `lean.BriefDigest`,
+`lean.RenderIndex`, and `lean.HookContext` in `internal/domain/decision/lean` — shared, unchanged, by every consumer: the `adg`
 CLI (the `adg lean` commands), the PreToolUse hook, CI, and any other tool that renders a lean brief or
 index. Duplicating the renderer, or moving/refactoring it so the hook and CI would render differently
 from the CLI, is forbidden.

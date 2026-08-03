@@ -26,9 +26,10 @@ a clearly cited ADR violation.
 - A new check must declare its tier: a **hard failure** (a non-warning `Issue` that exits `adg lean
   index` non-zero) only if a malformed model should stop CI; otherwise a **warning**
   (`Issue{Warning: true}`, printed but never blocking).
-- The injection paths (`adg lean brief --hook` → `HookContext`, `--whole` → `SessionBrief`,
-  `--invariants` → `SubagentBrief`) are **fail-open**: they inject guidance or nothing and never block or
-  error an edit/session/dispatch, regardless of a check's tier — even a hard-failure-tier finding.
+- The injection paths (`adg lean brief --hook` → `HookContext`, `--digest` → `SessionDigest`,
+  `--whole` → `SessionBrief`, `--invariants` → `SubagentBrief`) are **fail-open**: they inject guidance or
+  nothing and never block or error an edit/session/dispatch, regardless of a check's tier — even a
+  hard-failure-tier finding.
 - The commit advisor (`--staged` → `CommitAdvisory`) is the **deterministic block**: a staged path that
   hits a `forbids` glob returns a PreToolUse `permissionDecision: deny` carrying the brief; any other
   governed commit is advisory (`additionalContext`), and any parse/git error injects nothing. A block

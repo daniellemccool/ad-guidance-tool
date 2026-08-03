@@ -71,3 +71,17 @@ const MaxBriefLines = 60
 // one is usually a paragraph that has absorbed per-case detail belonging in
 // Guidance. Over the ceiling earns an advisory warning, not a failure.
 const MaxDecisionWords = 60
+
+// MaxDigestBytes is the hard byte ceiling on the rendered session digest (ADR-0021).
+// Sized so the digest always lands inline in a Claude Code hook injection instead of
+// being spooled to a file. Enforced by the degradation ladder in digest.go — the
+// digest shrinks, it never errors. Agent-facing: per ADR-0015 no project config may
+// change it or anything the digest renders.
+const MaxDigestBytes = 2048
+
+// MaxTitleRunes is the advisory ceiling for a record's H1 title (ADR-0022). On the
+// session digest the title carries the whole rule (~12 bytes/line of overhead; the
+// rest is title), so title length is brief real estate. Equal to the digest's
+// truncation cap, so a compliant title is never clipped there. Warning tier only;
+// per ADR-0015 it is not configurable and never changes what a brief renders.
+const MaxTitleRunes = 64

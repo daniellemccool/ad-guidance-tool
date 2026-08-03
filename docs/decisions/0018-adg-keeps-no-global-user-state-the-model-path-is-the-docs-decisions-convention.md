@@ -11,7 +11,7 @@ forbids:
     - internal/infrastructure/config/**
 ---
 
-# adg keeps no global user state; the model path is the docs/decisions convention
+# Keep adg free of global user state; docs/decisions by convention
 
 ## Decision
 

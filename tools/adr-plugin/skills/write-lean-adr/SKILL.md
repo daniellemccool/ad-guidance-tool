@@ -64,7 +64,7 @@ excludes:
     - "**/port_helpers.py"
 ---
 
-# <the decision, as a statement>
+# <the rule, as a short imperative instruction>
 
 ## Decision
 

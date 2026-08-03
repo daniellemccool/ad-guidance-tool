@@ -25,7 +25,7 @@ import (
 // --hook it runs as a Claude Code PreToolUse hook over stdin.
 func NewBriefCommand() *cobra.Command {
 	var modelPath string
-	var hook, full, compact, whole, invariants, staged, guard bool
+	var hook, full, compact, digest, whole, invariants, staged, guard bool
 
 	cmd := &cobra.Command{
 		Use:   "brief [changed-path...]",
@@ -48,8 +48,10 @@ detail (the debuggable form); --compact forces the condensed form.
 
 With --hook it runs as a Claude Code hook reading the hook JSON on stdin. By default
 (PreToolUse on an edit) it injects the brief for the edited file as additionalContext.
---whole injects the whole-corpus brief (SessionStart); --invariants injects the
-invariants-only brief (SubagentStart); --staged briefs the staged files on a git commit
+--digest injects the session-open digest — a grouped titles-only tripwire index of
+every in-force ADR, hard-capped at 2 KB so it always lands inline (SessionStart);
+--whole injects the whole-corpus brief (SubagentStart for planner agents); --invariants
+injects the invariants-only brief (SubagentStart); --staged briefs the staged files on a git commit
 Bash call, blocking only on a forbidden-scope hit; --guard blocks hand-creating an ADR
 record (a Write of a new NNNN-*.md under the model) and warns on editing one. Hook mode
 is fail-open on errors — a malformed payload or missing model injects nothing; only
@@ -64,15 +66,15 @@ auto rendering, so --full/--compact are invalid with --hook.`,
 					fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 					return err
 				}
-				if boolCount(whole, invariants, staged, guard) > 1 {
-					err := fmt.Errorf("--whole, --invariants, --staged, and --guard are mutually exclusive")
+				if boolCount(digest, whole, invariants, staged, guard) > 1 {
+					err := fmt.Errorf("--digest, --whole, --invariants, --staged, and --guard are mutually exclusive")
 					fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 					return err
 				}
-				return runHook(cmd, modelPath, whole, invariants, staged, guard)
+				return runHook(cmd, modelPath, digest, whole, invariants, staged, guard)
 			}
-			if whole || invariants || staged || guard {
-				err := fmt.Errorf("--whole/--invariants/--staged/--guard require --hook")
+			if digest || whole || invariants || staged || guard {
+				err := fmt.Errorf("--digest/--whole/--invariants/--staged/--guard require --hook")
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 				return err
 			}
@@ -110,7 +112,8 @@ auto rendering, so --full/--compact are invalid with --hook.`,
 
 	cmd.Flags().StringVar(&modelPath, "model", "", "Path to the lean ADR directory (default: docs/decisions)")
 	cmd.Flags().BoolVar(&hook, "hook", false, "Claude Code hook mode: read hook JSON from stdin and inject the brief (default: the edited file, PreToolUse)")
-	cmd.Flags().BoolVar(&whole, "whole", false, "Hook mode (SessionStart, or SubagentStart for planner agents): inject the whole-corpus brief — every in-force ADR")
+	cmd.Flags().BoolVar(&digest, "digest", false, "Hook mode (SessionStart): inject the session-open digest — grouped titles-only tripwire index, capped at 2 KB")
+	cmd.Flags().BoolVar(&whole, "whole", false, "Hook mode (SubagentStart for planner agents): inject the whole-corpus brief — every in-force ADR")
 	cmd.Flags().BoolVar(&invariants, "invariants", false, "Hook mode (SubagentStart): inject the invariants-only brief")
 	cmd.Flags().BoolVar(&staged, "staged", false, "Hook mode (PreToolUse on `git commit`): brief the staged files; block only on a forbidden-scope hit")
 	cmd.Flags().BoolVar(&guard, "guard", false, "Hook mode (PreToolUse on Write/Edit): guard the ADR model — block hand-creating a record, warn on editing one")
@@ -122,10 +125,11 @@ auto rendering, so --full/--compact are invalid with --hook.`,
 
 // runHook is fully fail-open: a misconfigured model, an empty directory, or a
 // malformed payload all inject nothing and exit 0, so the hook never breaks an edit.
-// The mode flags select which brief the hook injects: --whole (SessionStart), --invariants
-// (SubagentStart), --staged (commit-time advisory), or the default file-scoped brief
-// (PreToolUse on an edit). Rendering and routing stay in the domain (ADR-0002/0001).
-func runHook(cmd *cobra.Command, modelPath string, whole, invariants, staged, guard bool) error {
+// The mode flags select which brief the hook injects: --digest (SessionStart), --whole
+// (SubagentStart for planners), --invariants (SubagentStart), --staged (commit-time
+// advisory), or the default file-scoped brief (PreToolUse on an edit). Rendering and
+// routing stay in the domain (ADR-0002/0001).
+func runHook(cmd *cobra.Command, modelPath string, digest, whole, invariants, staged, guard bool) error {
 	resolved := util.ResolveModelPath(modelPath)
 	payload, err := io.ReadAll(cmd.InOrStdin())
 	if err != nil {
@@ -144,6 +148,8 @@ func runHook(cmd *cobra.Command, modelPath string, whole, invariants, staged, gu
 	}
 	var out string
 	switch {
+	case digest:
+		out = leandomain.SessionDigest(records, payload)
 	case whole:
 		out = leandomain.SessionBrief(records, payload)
 	case invariants:

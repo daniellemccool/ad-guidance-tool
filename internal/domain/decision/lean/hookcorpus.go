@@ -89,6 +89,14 @@ func SessionBrief(records []Record, payload []byte) string {
 	return hookEnvelope(hookEventName(payload, "SessionStart"), BriefWhole(records))
 }
 
+// SessionDigest builds the digest-class SessionStart injection (ADR-0021): the
+// grouped titles-only tripwire index in a hook envelope (event reflected from the
+// payload, default SessionStart). BriefDigest guarantees the MaxDigestBytes cap, so
+// the injection always lands inline. Fail-open — empty when no in-force ADRs exist.
+func SessionDigest(records []Record, payload []byte) string {
+	return hookEnvelope(hookEventName(payload, "SessionStart"), BriefDigest(records))
+}
+
 // SubagentBrief builds the SubagentStart injection: the invariants-only brief in a hook
 // envelope (event reflected, default SubagentStart). Empty when the model declares no
 // invariants. The SubagentStart payload carries no paths, so this cannot be file-scoped;

@@ -191,6 +191,13 @@ func validateOne(r Record, byID map[string]Record, budget Budget) []Issue {
 	// sections that are empty or still hold scaffold placeholders, so a fresh draft
 	// is not nagged about content it has not written yet.
 	if inForce(status) {
+		// Title-length nudge (ADR-0022): the session digest renders only the title,
+		// so an over-long one is either clipped there or crowding out other records.
+		if t := strings.TrimSpace(p.Title); t != "" {
+			if n := len([]rune(t)); n > MaxTitleRunes {
+				warn(fmt.Sprintf("title is %d runes (> %d); the session digest shows only the title — write it as a short imperative instruction and move detail into the body", n, MaxTitleRunes))
+			}
+		}
 		if d, ok := filledSection(p, "decision"); ok {
 			if hasListItem(d) {
 				warn("Decision contains a list; a Decision is the rule in prose (1–3 sentences) — per-case detail belongs in Guidance")

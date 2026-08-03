@@ -10,7 +10,7 @@ supersedes:
 priority: default
 ---
 
-# Lean is the sole user-facing adg ADR format; madr is shared parsing plumbing
+# Author ADRs only in lean; madr is shared parsing plumbing
 
 ## Decision
 

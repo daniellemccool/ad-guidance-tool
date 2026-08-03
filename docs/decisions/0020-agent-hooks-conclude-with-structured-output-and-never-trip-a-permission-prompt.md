@@ -8,7 +8,7 @@ applies_to:
 priority: invariant
 ---
 
-# Agent hooks conclude with structured output and never trip a permission prompt
+# End agent hooks in structured output, never a permission prompt
 
 ## Decision
 

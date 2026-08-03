@@ -9,7 +9,7 @@ applies_to:
 priority: invariant
 ---
 
-# Per-project config lives in .adg.yaml, read at the command edge, and never changes the brief
+# Keep project config in .adg.yaml; it never changes a brief
 
 ## Decision
 

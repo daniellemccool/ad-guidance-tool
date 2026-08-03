@@ -14,7 +14,7 @@ checks:
       expect: absent
 ---
 
-# adg makes no LLM calls; ADR review runs in a Claude Code subagent
+# Keep adg LLM-free; ADR review runs in a Claude Code subagent
 
 ## Decision
 

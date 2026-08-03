@@ -61,8 +61,7 @@ its mechanically-checkable parts are enforced as advisory warnings by `adg lean 
      → "Persist artifacts to disk before mark_succeeded"
 
    Retitling an existing record **never renames its `NNNN-*.md` file** — filenames are
-   load-bearing (record pointers, other records' globs, index links). Retitle
-   opportunistically when a record is next revised; never in retroactive bulk.
+   load-bearing (record pointers, other records' globs, index links).
 8. **State each fact once.** Decision = the rule, Guidance = what to do, Why = the reasoning
    (required). Don't repeat the same enumeration across Decision and Guidance.
 9. **For a behavioral rule, point at its test(s).** List the test that exercises the rule as

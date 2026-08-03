@@ -10,7 +10,7 @@ applies_to:
 priority: invariant
 ---
 
-# A lean record's reasoning is a required section, co-equal with Decision and Guidance
+# Require reasoning (## Why) in every accepted lean record
 
 ## Decision
 

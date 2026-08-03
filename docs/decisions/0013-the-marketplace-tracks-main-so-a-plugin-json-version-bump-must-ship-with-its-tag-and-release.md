@@ -7,7 +7,7 @@ applies_to:
 priority: invariant
 ---
 
-# The marketplace tracks main, so a plugin.json version bump must ship with its tag and release
+# Ship every plugin.json version bump with its tag and release
 
 ## Decision
 

@@ -20,7 +20,7 @@ A record's title is a short imperative instruction — commit-message mood, at m
 - Lead with the verb and state the rule as an order: "Derive failure classes from evidence, never message text", not "Failure classes are evidence-derived; message text lies about causes". Mechanism and rationale belong in Decision/Guidance/Why, not the title.
 - Aphoristic, not vague: a title that names a topic instead of a rule wastes its digest slot. No colon-separated enumerations.
 - The length check is the warning-tier const `MaxTitleRunes` in `template.go`, equal to the digest's truncation cap so a compliant title is never clipped; it is not configurable.
-- Retitling a record never renames its `NNNN-slug.md` file — filenames are load-bearing (record pointers, `applies_to` globs on other records, index links). Retitle opportunistically when a record is next revised; never retroactively in bulk.
+- Retitling a record never renames its `NNNN-slug.md` file — filenames are load-bearing (record pointers, `applies_to` globs on other records, index links).
 
 ## Why
 
